@@ -3,14 +3,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { aspectValue } from '@shared/project/canvas'
+import { ASPECT_RATIOS, type AspectRatio } from '@shared/project/schema'
 import { formatTimecode } from '@shared/project/time'
 import { findClip, projectDuration } from '@shared/timeline/clips'
 import { PreviewEngine, type LayerBox } from '../../engine/preview/PreviewEngine'
 import { editorStore, useEditorStore } from '../../state/editorStore'
-import { attachEngine, goToEnd, goToStart, pause, togglePlay } from '../../state/playbackActions'
+import { attachEngine, pause, togglePlay } from '../../state/playbackActions'
+import { updateSettings } from '../../state/projectActions'
 import { projectStore, useProjectStore } from '../../state/projectStore'
 import { setTransform } from '../../state/textActions'
 import { newSession } from '../Inspector/fields'
+import { Icon } from '../icons'
 import { FOCUS_TEXT_EVENT } from '../Inspector/TextPanel'
 
 /** Kéo tới gần giữa khung (theo tỉ lệ khung) thì tự hít vào giữa. */
@@ -27,6 +30,7 @@ export function PreviewStage(): React.JSX.Element {
   const { t } = useTranslation()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
   const engineRef = useRef<PreviewEngine | null>(null)
   const [box, setBox] = useState({ width: 0, height: 0 })
   const [selBox, setSelBox] = useState<Box | null>(null)
@@ -137,7 +141,9 @@ export function PreviewStage(): React.JSX.Element {
   }
 
   return (
-    <div className="preview-stage">
+    <section className="panel preview-panel" ref={panelRef}>
+      <header className="panel-header">{t('panels.preview')}</header>
+      <div className="preview-stage">
       <div className="preview-frame-wrap" ref={wrapRef}>
         <div className="preview-canvas-box" style={{ width: box.width, height: box.height }}>
           <canvas
@@ -154,21 +160,37 @@ export function PreviewStage(): React.JSX.Element {
       </div>
       <div className="preview-controls">
         <span className="timecode">
-          {formatTimecode(currentTime, fps)} <span className="hint">/ {formatTimecode(duration, fps)}</span>
+          <b>{formatTimecode(currentTime, fps)}</b> <span>/ {formatTimecode(duration, fps)}</span>
         </span>
-        <div className="preview-buttons">
-          <button className="icon" onClick={goToStart} title={t('preview.toStart')}>
-            ⏮
-          </button>
-          <button className="play" onClick={togglePlay} disabled={duration === 0} title={t('preview.playPause')}>
-            {playing ? '⏸' : '▶'}
-          </button>
-          <button className="icon" onClick={goToEnd} title={t('preview.toEnd')}>
-            ⏭
+        <button className="play" onClick={togglePlay} disabled={duration === 0} title={t('preview.playPause')}>
+          <Icon name={playing ? 'pause' : 'play'} size={20} />
+        </button>
+        <div className="preview-right">
+          {/* Tỉ lệ khung hình của dự án (giống nút "Tỉ lệ khung hình" của CapCut) */}
+          <label className="ratio-select" title={t('settings.aspectRatio')}>
+            <Icon name="ratio" size={15} />
+            <select value={aspectRatio} onChange={(e) => updateSettings({ aspectRatio: e.target.value as AspectRatio })}>
+              {ASPECT_RATIOS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="icon ghost"
+            title={t('preview.fullscreen')}
+            onClick={() => {
+              // Toàn màn hình cả khung Xem trước (Esc để thoát)
+              if (document.fullscreenElement) void document.exitFullscreen()
+              else void panelRef.current?.requestFullscreen()
+            }}
+          >
+            <Icon name="fullscreen" size={17} />
           </button>
         </div>
-        <span className="preview-ratio hint">{aspectRatio}</span>
       </div>
     </div>
+    </section>
   )
 }

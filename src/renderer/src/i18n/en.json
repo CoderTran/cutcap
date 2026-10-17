@@ -1,9 +1,6 @@
 {
   "panels": {
-    "media": "Media",
-    "preview": "Preview",
-    "inspector": "Properties",
-    "timeline": "Timeline"
+    "preview": "Preview"
   },
   "toolbar": {
     "open": "Open",
@@ -43,11 +40,14 @@
     "dropHint": "Drag videos, images or audio from the Media library here",
     "newTrack": "New {{kind}} track",
     "split": "Split",
-    "splitHint": "Split clip at playhead (Ctrl+B)",
+    "splitHint": "Split at playhead (Ctrl+B)",
     "delete": "Delete",
-    "deleteHint": "Delete selected clips (Delete)",
+    "deleteHint": "Delete (Delete)",
     "addText": "Add text",
-    "addTextHint": "Add text at the playhead"
+    "addTextHint": "Add text at the playhead",
+    "trimLeftHint": "Delete left of playhead (Q)",
+    "trimRightHint": "Delete right of playhead (W)",
+    "snapHint": "Snap to clip edges / playhead while dragging (magnet)"
   },
   "track": {
     "kind": {
@@ -92,7 +92,9 @@
     "transition": "Change transition",
     "clipColor": "Change clip color",
     "colorToAll": "Apply color to all clips",
-    "relinkMedia": "Relink media"
+    "relinkMedia": "Relink media",
+    "trimLeft": "Delete left part",
+    "trimRight": "Delete right part"
   },
   "status": {
     "loading": "Loading…",
@@ -129,10 +131,27 @@
       "ffmpeg-missing": "FFmpeg missing (run: npm run setup:ffmpeg)"
     },
     "relink": "Locate",
-    "missingNotice": "{{count}} source files not found – click \"Locate\" on a card to pick the new location."
+    "missingNotice": "{{count}} source files not found – click \"Locate\" on a card to pick the new location.",
+    "search": "Search media",
+    "searchAudio": "Search audio",
+    "filterTitle": "Filter by type",
+    "dropHintAudio": "Drop music or audio here, or click to choose files",
+    "added": "Added",
+    "addToTimeline": "Add to the timeline at the playhead (or double-click the card)"
   },
   "inspector": {
-    "multiSelected": "{{count}} clips selected"
+    "multiSelected": "{{count}} clips selected",
+    "tabs": {
+      "project": "Project",
+      "details": "Details",
+      "video": "Video",
+      "audio": "Audio",
+      "speed": "Speed",
+      "adjust": "Adjust",
+      "transition": "Transition",
+      "text": "Text",
+      "animation": "Animation"
+    }
   },
   "clip": {
     "track": "Track",
@@ -157,7 +176,8 @@
   "preview": {
     "toStart": "Go to start (Home)",
     "playPause": "Play / Pause (Space)",
-    "toEnd": "Go to end (End)"
+    "toEnd": "Go to end (End)",
+    "fullscreen": "Fullscreen (Esc to exit)"
   },
   "export": {
     "title": "Export video",
@@ -309,5 +329,57 @@
     "trash": "Move to Recycle Bin",
     "trashConfirm": "Move project \"{{name}}\" to the Recycle Bin?\nYour source videos, images and audio are NOT deleted.",
     "missingMedia": "{{count}} media files missing"
+  },
+  "titlebar": {
+    "menu": "Menu",
+    "rename": "Click to rename the project",
+    "notSaved": "Not saved",
+    "pending": "Saving…",
+    "autosaved": "Auto-saved: {{time}}",
+    "newProject": "New project",
+    "open": "Open project…",
+    "home": "Go to Home",
+    "save": "Save",
+    "saveAs": "Save as…",
+    "export": "Export"
+  },
+  "leftPanel": {
+    "media": "Media",
+    "audio": "Audio",
+    "text": "Text",
+    "transitions": "Transitions",
+    "filters": "Filters"
+  },
+  "textPresets": {
+    "heading": "Text presets",
+    "addHint": "Click to add text at the playhead",
+    "sample": "Text",
+    "default": "Default",
+    "title": "Big title",
+    "subtitle": "Subtitle",
+    "yellow": "Yellow pop",
+    "red": "Red outline",
+    "boxed": "White box",
+    "elegant": "Elegant",
+    "neon": "Cyan outline"
+  },
+  "transitionsTab": {
+    "heading": "Transitions",
+    "hint": "Click to apply at the cut nearest the playhead (between 2 adjacent clips).",
+    "noCut": "No cuts yet: place 2 video/image clips next to each other on one track."
+  },
+  "filtersTab": {
+    "heading": "Filters",
+    "selectHint": "Select a video or image clip on the timeline to apply a filter."
+  },
+  "details": {
+    "size": "Size",
+    "duration": "Duration",
+    "media": "Media files",
+    "clips": "Clips",
+    "tracks": "Tracks",
+    "created": "Created",
+    "updated": "Modified",
+    "location": "File location"
   }
 }

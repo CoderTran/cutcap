@@ -94,6 +94,8 @@ describe.skipIf(!hasFfmpeg)('MediaService với ffmpeg thật', () => {
     expect(png.thumbnailUrl).not.toBeNull()
     const wav = await service.prepare(files.wav)
     expect(wav).toMatchObject({ thumbnailUrl: null, proxy: 'not-needed' })
+    expect(existsSync(filePathFromMediaUrl(wav.waveformUrl!)!)).toBe(true)
+    expect(png.waveformUrl).toBeNull()
   }, 30_000)
 
   it('chỉ cho đọc file media hoặc file trong cache', () => {

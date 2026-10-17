@@ -1,4 +1,6 @@
-// Một thẻ media trong thư viện: thumbnail, thời lượng, trạng thái proxy, nút xóa.
+// Một thẻ media kiểu CapCut: ảnh thu nhỏ, "Đã thêm" (góc trái) khi đã dùng trên timeline,
+// thời lượng (góc phải), nút "+" (góc dưới phải) thêm vào timeline tại đầu phát.
+// Kéo thẻ thả vào timeline cũng được. Media chưa dùng có nút ✕ để bỏ khỏi thư viện.
 import { useTranslation } from 'react-i18next'
 import { isAssetUsed } from '@shared/project/ops'
 import type { MediaAsset } from '@shared/project/schema'
@@ -7,11 +9,11 @@ import { editorStore } from '../../state/editorStore'
 import { relinkAsset, removeAsset } from '../../state/mediaActions'
 import { useMediaPreview } from '../../state/mediaStore'
 import { useProjectStore } from '../../state/projectStore'
+import { addAssetAtPlayhead } from '../../state/timelineActions'
+import { Icon } from '../icons'
 
-/** Kiểu dữ liệu kéo thả nội bộ – Bước 3 timeline sẽ nhận kiểu này khi thả thẻ vào track. */
+/** Kiểu dữ liệu kéo thả nội bộ – timeline nhận kiểu này khi thả thẻ vào track. */
 export const ASSET_DRAG_TYPE = 'application/x-cutcap-asset'
-
-const KIND_ICON: Record<MediaAsset['kind'], string> = { video: '🎬', image: '🖼', audio: '🎵' }
 
 export function MediaCard({ asset }: { asset: MediaAsset }): React.JSX.Element {
   const { t } = useTranslation()
@@ -34,7 +36,7 @@ export function MediaCard({ asset }: { asset: MediaAsset }): React.JSX.Element {
 
   return (
     <div
-      className={`media-card ${missing || failed ? 'broken' : ''}`}
+      className={`media-card ${missing || failed ? 'broken' : ''} kind-${asset.kind}`}
       title={details}
       draggable={!missing}
       onDragStart={(e) => {
@@ -43,21 +45,25 @@ export function MediaCard({ asset }: { asset: MediaAsset }): React.JSX.Element {
         editorStore.getState().setDraggingAsset(asset.id)
       }}
       onDragEnd={() => editorStore.getState().setDraggingAsset(null)}
+      onDoubleClick={() => !missing && addAssetAtPlayhead(asset.id)}
     >
       <div className="media-thumb">
         {preview?.thumbnailUrl ? (
           <img src={preview.thumbnailUrl} alt="" draggable={false} />
         ) : (
-          <span className="media-thumb-icon">{KIND_ICON[asset.kind]}</span>
+          <span className="media-thumb-icon">
+            <Icon name={asset.kind === 'audio' ? 'audio' : 'media'} size={30} />
+          </span>
         )}
 
+        {used && <span className="badge added">{t('media.added')}</span>}
         {asset.kind !== 'image' && !proxyBusy && <span className="badge duration">{formatDuration(asset.durationUs)}</span>}
 
         {missing && (
           <div className="media-state">
             <span>{t('media.missing')}</span>
             <button className="small" onClick={() => void relinkAsset(asset.id)}>
-              🔍 {t('media.relink')}
+              <Icon name="search" size={12} /> {t('media.relink')}
             </button>
           </div>
         )}
@@ -82,17 +88,30 @@ export function MediaCard({ asset }: { asset: MediaAsset }): React.JSX.Element {
           </span>
         )}
 
-        <button
-          className="icon media-remove"
-          disabled={used}
-          title={used ? t('media.inUse') : t('media.remove')}
-          onClick={(e) => {
-            e.stopPropagation()
-            removeAsset(asset.id)
-          }}
-        >
-          ✕
-        </button>
+        {!used && (
+          <button
+            className="icon media-remove"
+            title={t('media.remove')}
+            onClick={(e) => {
+              e.stopPropagation()
+              removeAsset(asset.id)
+            }}
+          >
+            <Icon name="close" size={12} />
+          </button>
+        )}
+        {!missing && (
+          <button
+            className="media-add"
+            title={t('media.addToTimeline')}
+            onClick={(e) => {
+              e.stopPropagation()
+              addAssetAtPlayhead(asset.id)
+            }}
+          >
+            <Icon name="plus" size={14} />
+          </button>
+        )}
       </div>
       <div className="media-name">{asset.name}</div>
     </div>

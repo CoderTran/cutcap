@@ -3,7 +3,7 @@
 import * as ops from '@shared/project/ops'
 import type { Id } from '@shared/project/schema'
 import { MICROS_PER_SECOND, type Micros } from '@shared/project/time'
-import { createMediaClip, resolveDrop } from '@shared/timeline/clips'
+import { createMediaClip, mainTrackFor, resolveDrop, trackKindForAsset } from '@shared/timeline/clips'
 import {
   applyMoves,
   applyTrim,
@@ -49,6 +49,14 @@ export function dropAssetOnTimeline(assetId: Id, trackId: Id | null, start: Micr
   return clip.id
 }
 
+/** Nút "+" trên thẻ media: thêm vào track chính tại đầu phát (chỗ đó bận thì tạo track mới). */
+export function addAssetAtPlayhead(assetId: Id): Id | null {
+  const asset = project().assets[assetId]
+  if (!asset) return null
+  const track = mainTrackFor(project(), trackKindForAsset(asset))
+  return dropAssetOnTimeline(assetId, track?.id ?? null, editorStore.getState().currentTime)
+}
+
 /** Di chuyển clip (sau khi kéo thả). */
 export function moveClips(moves: ClipMove[]): void {
   if (moves.length > 0) apply('history.moveClips', (d) => applyMoves(d, moves))
@@ -72,6 +80,19 @@ export function splitAtPlayhead(): void {
     }
   })
   setSelection(rightIds)
+}
+
+/**
+ * Q / W (giống CapCut): bỏ phần bên TRÁI (Q) hoặc bên PHẢI (W) của clip tại đầu phát.
+ * Áp cho clip đang chọn nằm dưới đầu phát; không chọn thì mọi clip dưới đầu phát (track không khóa).
+ */
+export function trimAtPlayhead(side: 'left' | 'right'): void {
+  const { currentTime, selectedClipIds } = editorStore.getState()
+  const ids = clipsToSplit(project(), selectedClipIds, currentTime, minClipDuration())
+  if (ids.length === 0) return
+  apply(side === 'left' ? 'history.trimLeft' : 'history.trimRight', (d) => {
+    for (const id of ids) applyTrim(d, id, side === 'left' ? 'start' : 'end', currentTime, minClipDuration())
+  })
 }
 
 /** Delete: xóa clip đang chọn (bỏ qua clip trên track khóa). */

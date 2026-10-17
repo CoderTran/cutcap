@@ -72,6 +72,21 @@ export function thumbnailArgs(info: ProbeInfo, src: string, dest: string): strin
   ]
 }
 
+/** Bề rộng ảnh sóng âm (cho cả file). Timeline co giãn ảnh theo mức zoom. */
+export const WAVEFORM_WIDTH = 2400
+export const WAVEFORM_HEIGHT = 96
+
+/** Lệnh vẽ ảnh sóng âm (nền trong suốt, sóng trắng – giao diện tự tô màu bằng CSS). */
+export function waveformArgs(src: string, dest: string): string[] {
+  return [
+    '-hide_banner', '-loglevel', 'error', '-y',
+    '-i', src,
+    '-filter_complex', `aformat=channel_layouts=mono,showwavespic=s=${WAVEFORM_WIDTH}x${WAVEFORM_HEIGHT}:colors=white:scale=sqrt`,
+    '-frames:v', '1', '-update', '1',
+    dest
+  ]
+}
+
 /**
  * Lệnh tạo proxy. Ghi tiến trình ra stdout ("-progress pipe:1") để hiện thanh phần trăm.
  * @param dest đường dẫn file tạm; caller đổi tên sau khi xong (để không bao giờ dùng nhầm file dở dang)

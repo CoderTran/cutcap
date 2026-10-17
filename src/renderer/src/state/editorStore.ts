@@ -20,6 +20,10 @@ export interface EditorState {
   clipboard: ClipboardItem[]
   /** Đang rê chuột lên một bộ lọc: preview tạm áp bộ lọc đó cho clip (không đổi dự án). */
   filterPreview: { clipId: Id; filter: string | null } | null
+  /** Tab bảng phải cần mở cho lần chọn hiện tại (vd. 'transition'); null = tab đầu tiên. */
+  inspectorTab: string | null
+  /** Hít (snap) khi kéo/thả clip – nút nam châm trên thanh công cụ timeline. */
+  snapping: boolean
 
   setCurrentTime(t: Micros): void
   setZoom(pxPerSecond: number): void
@@ -31,6 +35,9 @@ export interface EditorState {
   setDraggingAsset(assetId: Id | null): void
   setClipboard(items: ClipboardItem[]): void
   setFilterPreview(preview: { clipId: Id; filter: string | null } | null): void
+  /** Chọn clip và mở sẵn một tab của bảng phải. */
+  selectWithTab(clipId: Id, tab: string): void
+  toggleSnapping(): void
 }
 
 export const editorStore = createStore<EditorState>()((set) => ({
@@ -41,21 +48,25 @@ export const editorStore = createStore<EditorState>()((set) => ({
   draggingAssetId: null,
   clipboard: [],
   filterPreview: null,
+  inspectorTab: null,
+  snapping: true,
 
   setCurrentTime: (t) => set({ currentTime: Math.max(0, Math.round(t)) }),
   setZoom: (pxPerSecond) => set({ pxPerSecond: clampZoom(pxPerSecond) }),
   setPlaying: (playing) => set({ playing }),
   selectClip: (clipId, additive = false) =>
     set((s) => {
-      if (!additive) return { selectedClipIds: [clipId] }
+      if (!additive) return { selectedClipIds: [clipId], inspectorTab: null }
       const has = s.selectedClipIds.includes(clipId)
       return { selectedClipIds: has ? s.selectedClipIds.filter((id) => id !== clipId) : [...s.selectedClipIds, clipId] }
     }),
-  setSelection: (selectedClipIds) => set({ selectedClipIds }),
+  setSelection: (selectedClipIds) => set({ selectedClipIds, inspectorTab: null }),
   clearSelection: () => set({ selectedClipIds: [] }),
   setDraggingAsset: (draggingAssetId) => set({ draggingAssetId }),
   setClipboard: (clipboard) => set({ clipboard }),
-  setFilterPreview: (filterPreview) => set({ filterPreview })
+  setFilterPreview: (filterPreview) => set({ filterPreview }),
+  selectWithTab: (clipId, inspectorTab) => set({ selectedClipIds: [clipId], inspectorTab }),
+  toggleSnapping: () => set((s) => ({ snapping: !s.snapping }))
 }))
 
 export function useEditorStore<T>(selector: (s: EditorState) => T): T {

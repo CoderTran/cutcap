@@ -110,6 +110,15 @@ export function resolveDrop(project: Project, asset: MediaAsset, trackId: Id | n
   return { trackId: null, kind, start: clamped }
 }
 
+/**
+ * Track chính kiểu CapCut: track video NẰM DƯỚI CÙNG (các track video phía trên là lớp phủ).
+ * Với media âm thanh: track âm thanh đầu tiên.
+ */
+export function mainTrackFor(project: Project, kind: TrackKind): Track | undefined {
+  const same = project.tracks.filter((t) => t.kind === kind && !t.locked)
+  return kind === 'video' ? same.at(-1) : same[0]
+}
+
 /** Tìm clip theo id trên mọi track. */
 export function findClip(project: Project, clipId: Id): { track: Track; clip: Clip } | null {
   for (const track of project.tracks) {

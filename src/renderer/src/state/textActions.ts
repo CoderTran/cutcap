@@ -14,10 +14,14 @@ const coalesce = (session: string | undefined) =>
  * Thêm chữ tại đầu phát: dùng track chữ đầu tiên còn trống chỗ đó, không có thì tạo track chữ mới.
  * @returns id clip chữ mới
  */
-export function addTextAtPlayhead(defaultText: string): Id {
+export function addTextAtPlayhead(
+  defaultText: string,
+  preset?: { style?: Partial<TextStyle>; animationIn?: TextAnimation }
+): Id {
   const { project, apply } = projectStore.getState()
   const start = editorStore.getState().currentTime
-  const clip = createTextClip(start, defaultText)
+  const base = createTextClip(start, defaultText)
+  const clip = { ...base, style: { ...base.style, ...preset?.style }, animationIn: preset?.animationIn ?? base.animationIn }
   const free = project.tracks.find((t) => t.kind === 'text' && !t.locked && canPlace(t, start, DEFAULT_TEXT_DURATION))
   apply('history.addText', (d) => ops.addClip(d, free?.id ?? ops.addTrack(d, 'text'), clip))
   editorStore.getState().setSelection([clip.id])

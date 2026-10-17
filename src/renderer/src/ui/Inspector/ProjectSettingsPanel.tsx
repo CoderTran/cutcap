@@ -10,7 +10,6 @@ export function ProjectSettingsPanel(): React.JSX.Element {
   const { t } = useTranslation()
   const name = useProjectStore((s) => s.project.name)
   const settings = useProjectStore((s) => s.project.settings)
-  const filePath = useProjectStore((s) => s.filePath)
   const size = canvasSize(settings.aspectRatio, settings.resolution)
 
   // Tên dự án: giữ bản nháp cục bộ khi đang gõ, chỉ ghi vào dự án khi rời ô hoặc nhấn Enter
@@ -24,8 +23,6 @@ export function ProjectSettingsPanel(): React.JSX.Element {
 
   return (
     <div className="form">
-      <h3 className="form-title">{t('settings.title')}</h3>
-
       <label className="field">
         <span>{t('settings.name')}</span>
         <input
@@ -86,11 +83,7 @@ export function ProjectSettingsPanel(): React.JSX.Element {
         </select>
       </label>
 
-      <p className="hint">
-        {t('settings.canvasSize', { width: size.width, height: size.height })}
-        <br />
-        {filePath ?? t('project.notSavedYet')}
-      </p>
+      <p className="hint">{t('settings.canvasSize', { width: size.width, height: size.height })}</p>
     </div>
   )
 }

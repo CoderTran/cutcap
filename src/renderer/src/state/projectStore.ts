@@ -26,6 +26,8 @@ export interface ProjectState {
   history: History
   /** id bước lịch sử tại thời điểm lưu gần nhất (null = trạng thái ban đầu). */
   savedEntryId: number | null
+  /** Lần lưu file gần nhất (ISO) – hiện "Tự động lưu: 08:33:34" trên thanh tiêu đề. */
+  lastSavedAt: string | null
 
   /** Sửa dự án và ghi lại để Undo. `label` là khóa i18n mô tả thao tác. */
   apply(label: string, recipe: (draft: Draft<Project>) => void, options?: Pick<CommitOptions, 'coalesceKey' | 'coalesceWindowMs'>): void
@@ -36,8 +38,12 @@ export interface ProjectState {
    * @param options.dirty true = coi như có thay đổi chưa lưu (dự án khôi phục sau sự cố)
    */
   load(project: Project, filePath: string | null, options?: { dirty?: boolean }): void
-  /** Đánh dấu đã lưu xuống file thành công. */
-  markSaved(filePath: string, savedAt: string): void
+  /**
+   * Đánh dấu đã lưu xuống file thành công.
+   * @param savedEntryId bước lịch sử ứng với nội dung ĐÃ GHI (lấy lúc bắt đầu lưu). Nếu người dùng
+   *        sửa tiếp trong lúc đang lưu, những sửa đổi đó vẫn được tính là "chưa lưu".
+   */
+  markSaved(filePath: string, savedAt: string, savedEntryId?: number | null): void
 }
 
 export function createProjectStore(initial: Project = createEmptyProject('')) {
@@ -46,6 +52,7 @@ export function createProjectStore(initial: Project = createEmptyProject('')) {
     filePath: null,
     history: emptyHistory(),
     savedEntryId: null,
+    lastSavedAt: null,
 
     apply(label, recipe, options) {
       const { project, history, savedEntryId } = get()
@@ -67,16 +74,23 @@ export function createProjectStore(initial: Project = createEmptyProject('')) {
 
     load(project, filePath, options) {
       // savedEntryId = -1: không bước lịch sử nào có id này → luôn "chưa lưu" cho tới khi bấm Lưu
-      set({ project, filePath, history: emptyHistory(), savedEntryId: options?.dirty ? -1 : null })
+      set({
+        project,
+        filePath,
+        history: emptyHistory(),
+        savedEntryId: options?.dirty ? -1 : null,
+        lastSavedAt: filePath && !options?.dirty ? project.updatedAt : null
+      })
     },
 
-    markSaved(filePath, savedAt) {
+    markSaved(filePath, savedAt, savedEntryId) {
       const { project, history } = get()
       set({
         filePath,
         // Cập nhật updatedAt nhưng KHÔNG ghi vào lịch sử (lưu file không phải thao tác chỉnh sửa)
         project: { ...project, updatedAt: savedAt },
-        savedEntryId: currentEntryId(history)
+        savedEntryId: savedEntryId === undefined ? currentEntryId(history) : savedEntryId,
+        lastSavedAt: savedAt
       })
     }
   }))

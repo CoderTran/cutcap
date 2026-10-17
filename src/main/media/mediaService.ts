@@ -14,7 +14,7 @@ import { fileNameOf, mediaKindFromPath } from '@shared/media/formats'
 import { createId } from '@shared/project/factory'
 import { ProbeError, probeFile, type ProbeInfo } from './probe'
 import { parseProgressLine, runProcess } from './processRunner'
-import { proxyArgs, proxyFileName, proxyNeeded, thumbnailArgs, type ProxyKind } from './transcode'
+import { proxyArgs, proxyFileName, proxyNeeded, thumbnailArgs, waveformArgs, type ProxyKind } from './transcode'
 import { mediaUrl } from './mediaUrl'
 
 export interface MediaServiceOptions {
@@ -122,6 +122,7 @@ export class MediaService {
       path,
       status: 'ready',
       thumbnailUrl: null,
+      waveformUrl: null,
       playbackUrl: null,
       proxy: 'not-needed',
       proxyProgress: 0,
@@ -157,18 +158,33 @@ export class MediaService {
       if (existsSync(thumb)) thumbnailUrl = mediaUrl(thumb)
     }
 
+    // Sóng âm (cho clip có tiếng trên timeline) – nhanh, làm ngay; lỗi thì bỏ qua
+    let waveformUrl: string | null = null
+    if (info.hasAudio && info.kind !== 'image') {
+      const wave = join(dir, 'waveform.png')
+      if (!existsSync(wave)) {
+        try {
+          await runProcess(this.ffmpegExe, waveformArgs(path, `${wave}.part.png`))
+          await rename(`${wave}.part.png`, wave)
+        } catch {
+          // không có sóng âm cũng không sao
+        }
+      }
+      if (existsSync(wave)) waveformUrl = mediaUrl(wave)
+    }
+
     // Bản phát: file gốc, proxy đã có sẵn, hoặc xếp hàng tạo proxy
     const kind = proxyNeeded(info, path)
     if (!kind) {
       const { mtimeMs } = await stat(path)
-      return this.store({ ...base, thumbnailUrl, playbackUrl: mediaUrl(path, Math.round(mtimeMs)) })
+      return this.store({ ...base, thumbnailUrl, waveformUrl, playbackUrl: mediaUrl(path, Math.round(mtimeMs)) })
     }
     const proxyPath = join(dir, proxyFileName(kind))
     if (existsSync(proxyPath)) {
-      return this.store({ ...base, thumbnailUrl, playbackUrl: mediaUrl(proxyPath), proxy: 'ready', proxyProgress: 1 })
+      return this.store({ ...base, thumbnailUrl, waveformUrl, playbackUrl: mediaUrl(proxyPath), proxy: 'ready', proxyProgress: 1 })
     }
 
-    const preview = this.store({ ...base, thumbnailUrl, proxy: 'queued' })
+    const preview = this.store({ ...base, thumbnailUrl, waveformUrl, proxy: 'queued' })
     this.enqueue({ path, kind, info, dest: proxyPath, controller: new AbortController() })
     return preview
   }

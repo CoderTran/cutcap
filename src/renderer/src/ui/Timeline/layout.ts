@@ -2,7 +2,7 @@
 import type { Track, TrackKind } from '@shared/project/schema'
 
 /** Bề rộng cột tiêu đề track bên trái. */
-export const HEADER_WIDTH = 210
+export const HEADER_WIDTH = 150
 export const RULER_HEIGHT = 28
 /** Vùng trống dưới các track để thả media tạo track mới. */
 export const DROP_ZONE_HEIGHT = 56
@@ -11,7 +11,7 @@ export const TAIL_PADDING_PX = 600
 /** Kéo/thả cách mốc dưới bấy nhiêu pixel thì tự hít vào mốc đó. */
 export const SNAP_PX = 8
 
-const TRACK_HEIGHT: Record<TrackKind, number> = { video: 64, audio: 44, text: 36, sticker: 36 }
+const TRACK_HEIGHT: Record<TrackKind, number> = { video: 72, audio: 48, text: 42, sticker: 42 }
 
 export function trackHeight(track: Pick<Track, 'kind'>): number {
   return TRACK_HEIGHT[track.kind]

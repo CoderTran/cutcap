@@ -182,7 +182,8 @@ export function Timeline(): React.JSX.Element {
     const rawStart = pxToTime(e.clientX - content.left - HEADER_WIDTH, pps)
     const clipDuration = asset.kind === 'image' ? DEFAULT_IMAGE_DURATION : asset.durationUs
     const points = collectSnapPoints(projectStore.getState().project, editorStore.getState().currentTime)
-    const snapped = snapSpan(Math.max(0, rawStart), clipDuration, points, pxToTime(SNAP_PX, pps))
+    const threshold = editorStore.getState().snapping ? pxToTime(SNAP_PX, pps) : 0
+    const snapped = snapSpan(Math.max(0, rawStart), clipDuration, points, threshold)
     const target = resolveDrop(projectStore.getState().project, asset, trackId, snapped.start)
     return { ...target, duration: clipDuration, snappedTo: snapped.snappedTo }
   }
@@ -267,6 +268,7 @@ export function Timeline(): React.JSX.Element {
                     selected={selectedSet.has(clip.id)}
                     dragging={draggingSet.has(clip.id)}
                     locked={track.locked}
+                    fps={project.settings.fps}
                     onPointerDown={onClipPointerDown}
                   />
                 ))}

@@ -13,7 +13,7 @@ export const FOCUS_TEXT_EVENT = 'cutcap:focus-text'
 
 const ALIGNS: TextStyle['align'][] = ['left', 'center', 'right']
 
-export function TextPanel({ clip, track }: { clip: TextClip; track: Track }): React.JSX.Element {
+export function TextPanel({ clip, track, section }: { clip: TextClip; track: Track; section: 'text' | 'animation' }): React.JSX.Element {
   const { t } = useTranslation()
   const fonts = useSystemFonts()
   const disabled = track.locked
@@ -36,9 +36,10 @@ export function TextPanel({ clip, track }: { clip: TextClip; track: Track }): Re
 
   return (
     <div className="form">
-      <h3 className="form-title">{t('text.title')}</h3>
       {disabled && <p className="hint">🔒 {t('clip.locked')}</p>}
 
+      {section === 'text' && (
+      <>
       <textarea
         ref={textareaRef}
         className="text-input"
@@ -143,6 +144,10 @@ export function TextPanel({ clip, track }: { clip: TextClip; track: Track }): Re
         </div>
       </section>
 
+      </>
+      )}
+
+      {section === 'animation' && (
       <section className="inspector-section">
         <h4>{t('text.animationTitle')}</h4>
         <label className="field">
@@ -174,7 +179,9 @@ export function TextPanel({ clip, track }: { clip: TextClip; track: Track }): Re
         )}
       </section>
 
-      <TransformSection clip={clip} disabled={disabled} />
+      )}
+
+      {section === 'text' && <TransformSection clip={clip} disabled={disabled} />}
     </div>
   )
 }

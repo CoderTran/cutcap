@@ -33,7 +33,7 @@ export const TransitionMarkers = memo(function TransitionMarkers({ project, trac
         const active = transitionAt(project, track, i)
         const select = (e: React.PointerEvent): void => {
           e.stopPropagation() // không để track bắt sự kiện (sẽ bỏ chọn / dời đầu phát)
-          if (e.button === 0) editorStore.getState().setSelection([clip.id])
+          if (e.button === 0) editorStore.getState().selectWithTab(clip.id, 'transition')
         }
         if (!active) {
           return (

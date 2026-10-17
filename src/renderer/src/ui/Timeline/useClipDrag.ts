@@ -83,9 +83,9 @@ export function useClipDrag(
     s.moved = true
 
     const project = projectStore.getState().project
-    const { pxPerSecond, currentTime } = editorStore.getState()
+    const { pxPerSecond, currentTime, snapping } = editorStore.getState()
     const dt = pxToTime(dx, pxPerSecond)
-    const threshold = pxToTime(SNAP_PX, pxPerSecond)
+    const threshold = snapping ? pxToTime(SNAP_PX, pxPerSecond) : 0
     const points = collectSnapPoints(project, currentTime, s.clipIds)
     const found = findClip(project, s.clipId)
     if (!found) return

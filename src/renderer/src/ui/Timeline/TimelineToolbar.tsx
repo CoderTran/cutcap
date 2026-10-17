@@ -1,11 +1,13 @@
-// Thanh công cụ trên timeline: thời gian hiện tại / tổng, thu phóng.
+// Thanh công cụ timeline kiểu CapCut:
+//   trái:  Hoàn tác · Làm lại | Tách (Ctrl+B) · Xóa trái (Q) · Xóa phải (W) · Xóa (Delete)
+//   phải:  Nam châm (hít) | Thu nhỏ · thanh zoom · Phóng to · Vừa khung
 import { useTranslation } from 'react-i18next'
-import { formatTimecode } from '@shared/project/time'
 import { MAX_PX_PER_SECOND, MIN_PX_PER_SECOND } from '@shared/timeline/ruler'
-import { useEditorStore } from '../../state/editorStore'
-import { addTextAtPlayhead } from '../../state/textActions'
-import { deleteSelected, splitAtPlayhead } from '../../state/timelineActions'
-import { useProjectStore } from '../../state/projectStore'
+import { editorStore, useEditorStore } from '../../state/editorStore'
+import { redo, undo } from '../../state/projectActions'
+import { selectCanRedo, selectCanUndo, selectRedoLabel, selectUndoLabel, useProjectStore } from '../../state/projectStore'
+import { deleteSelected, splitAtPlayhead, trimAtPlayhead } from '../../state/timelineActions'
+import { Icon, type IconName } from '../icons'
 
 // Thanh trượt zoom dùng thang logarit: mỗi nấc tăng/giảm theo tỉ lệ, cảm giác đều tay hơn
 const LOG_MIN = Math.log(MIN_PX_PER_SECOND)
@@ -20,33 +22,40 @@ interface Props {
   onFit(): void
 }
 
+function ToolButton({ icon, title, onClick, disabled, active }: { icon: IconName; title: string; onClick: () => void; disabled?: boolean; active?: boolean }): React.JSX.Element {
+  return (
+    <button className={`tool-button ${active ? 'active' : ''}`} onClick={onClick} disabled={disabled} title={title}>
+      <Icon name={icon} size={18} />
+    </button>
+  )
+}
+
 export function TimelineToolbar({ durationUs, onZoom, onFit }: Props): React.JSX.Element {
   const { t } = useTranslation()
   const pps = useEditorStore((s) => s.pxPerSecond)
-  const currentTime = useEditorStore((s) => s.currentTime)
-  const fps = useProjectStore((s) => s.project.settings.fps)
+  const snapping = useEditorStore((s) => s.snapping)
   const hasSelection = useEditorStore((s) => s.selectedClipIds.length > 0)
+  const canUndo = useProjectStore(selectCanUndo)
+  const canRedo = useProjectStore(selectCanRedo)
+  const undoLabel = useProjectStore(selectUndoLabel)
+  const redoLabel = useProjectStore(selectRedoLabel)
+  const empty = durationUs === 0
 
   return (
     <div className="tl-toolbar">
       <div className="tl-tools">
-        <button onClick={splitAtPlayhead} disabled={durationUs === 0} title={t('timeline.splitHint')}>
-          ✂ {t('timeline.split')}
-        </button>
-        <button onClick={deleteSelected} disabled={!hasSelection} title={t('timeline.deleteHint')}>
-          🗑 {t('timeline.delete')}
-        </button>
-        <button onClick={() => addTextAtPlayhead(t('text.default'))} title={t('timeline.addTextHint')}>
-          T+ {t('timeline.addText')}
-        </button>
+        <ToolButton icon="undo" onClick={undo} disabled={!canUndo} title={undoLabel ? `${t('toolbar.undo')}: ${t(undoLabel)} (Ctrl+Z)` : t('toolbar.undo')} />
+        <ToolButton icon="redo" onClick={redo} disabled={!canRedo} title={redoLabel ? `${t('toolbar.redo')}: ${t(redoLabel)} (Ctrl+Y)` : t('toolbar.redo')} />
+        <span className="tool-sep" />
+        <ToolButton icon="split" onClick={splitAtPlayhead} disabled={empty} title={t('timeline.splitHint')} />
+        <ToolButton icon="splitLeft" onClick={() => trimAtPlayhead('left')} disabled={empty} title={t('timeline.trimLeftHint')} />
+        <ToolButton icon="splitRight" onClick={() => trimAtPlayhead('right')} disabled={empty} title={t('timeline.trimRightHint')} />
+        <ToolButton icon="trash" onClick={deleteSelected} disabled={!hasSelection} title={t('timeline.deleteHint')} />
       </div>
-      <span className="tl-time">
-        <b>{formatTimecode(currentTime, fps)}</b> / {formatTimecode(durationUs, fps)}
-      </span>
       <div className="tl-zoom">
-        <button className="icon" onClick={() => onZoom(pps / 1.5)} title={t('timeline.zoomOut')}>
-          −
-        </button>
+        <ToolButton icon="magnet" onClick={() => editorStore.getState().toggleSnapping()} active={snapping} title={t('timeline.snapHint')} />
+        <span className="tool-sep" />
+        <ToolButton icon="zoomOut" onClick={() => onZoom(pps / 1.5)} title={t('timeline.zoomOut')} />
         <input
           type="range"
           min={0}
@@ -54,14 +63,11 @@ export function TimelineToolbar({ durationUs, onZoom, onFit }: Props): React.JSX
           step={0.5}
           value={toSlider(pps)}
           onChange={(e) => onZoom(fromSlider(Number(e.target.value)))}
+          onPointerUp={(e) => e.currentTarget.blur()}
           aria-label={t('timeline.zoom')}
         />
-        <button className="icon" onClick={() => onZoom(pps * 1.5)} title={t('timeline.zoomIn')}>
-          +
-        </button>
-        <button onClick={onFit} disabled={durationUs === 0} title={t('timeline.fitHint')}>
-          {t('timeline.fit')}
-        </button>
+        <ToolButton icon="zoomIn" onClick={() => onZoom(pps * 1.5)} title={t('timeline.zoomIn')} />
+        <ToolButton icon="fit" onClick={onFit} disabled={empty} title={t('timeline.fitHint')} />
       </div>
     </div>
   )

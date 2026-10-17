@@ -122,6 +122,8 @@ export interface MediaPreview {
   path: string
   status: 'ready' | 'missing' | 'error'
   thumbnailUrl: string | null
+  /** Ảnh sóng âm của CẢ file (null = không có tiếng) – timeline cắt đúng đoạn clip dùng. */
+  waveformUrl: string | null
   /** URL cho <video>/<audio>/<img> trong preview: proxy nếu có, ngược lại file gốc. null = đang tạo proxy. */
   playbackUrl: string | null
   proxy: ProxyState

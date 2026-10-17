@@ -1,18 +1,14 @@
-// Thuộc tính clip đang chọn: tốc độ, âm thanh (âm lượng, fade), và thông tin.
-// Bước 8 thêm chữ; Bước 10–11 thêm chuyển cảnh, bộ lọc màu.
+// Các mục thuộc tính của clip media (Inspector ghép chúng thành các tab kiểu CapCut):
+// Tốc độ, Âm thanh (âm lượng, fade), Thông tin.
 import { useTranslation } from 'react-i18next'
 import type { Clip, MediaAsset, MediaClip, Track } from '@shared/project/schema'
 import { MICROS_PER_SECOND, formatDuration, formatTimecode } from '@shared/project/time'
 import { clipEnd } from '@shared/timeline/clips'
 import { MAX_SPEED, MAX_VOLUME, MIN_SPEED, effectiveFades, planSpeed } from '@shared/timeline/clipProps'
-import { canHaveTransition } from '@shared/timeline/transitions'
 import { setClipFades, setClipSpeed, setClipVolume } from '../../state/clipActions'
 import { projectStore, useProjectStore } from '../../state/projectStore'
 import { minClipDuration } from '../../state/timelineActions'
 import { SliderField } from './SliderField'
-import { ColorSection } from './ColorSection'
-import { TransformSection } from './TransformSection'
-import { TransitionSection } from './TransitionSection'
 
 const SPEED_PRESETS = [0.25, 0.5, 1, 1.5, 2, 4]
 
@@ -22,31 +18,7 @@ const fromSlider = (v: number): number => Math.round(2 ** v * 100) / 100
 /** Fade tối đa 10 giây (hoặc bằng độ dài clip nếu ngắn hơn). */
 const MAX_FADE_US = 10 * MICROS_PER_SECOND
 
-export function ClipInfoPanel({ clip, track }: { clip: Clip; track: Track }): React.JSX.Element {
-  const { t } = useTranslation()
-  const asset = useProjectStore((s) => (clip.type === 'text' ? undefined : s.project.assets[clip.assetId]))
-  const isTimed = clip.type === 'media' && asset !== undefined && asset.kind !== 'image'
-  const transitionable = useProjectStore((s) => canHaveTransition(s.project, track, track.clips.indexOf(clip)))
-
-  return (
-    <div className="form">
-      <h3 className="form-title" title={asset?.path}>
-        {clip.type === 'text' ? clip.text : (asset?.name ?? '?')}
-      </h3>
-      {track.locked && <p className="hint">🔒 {t('clip.locked')}</p>}
-
-      {transitionable && clip.type === 'media' && <TransitionSection clip={clip} track={track} />}
-      {isTimed && clip.type === 'media' && <SpeedSection clip={clip} disabled={track.locked} />}
-      {isTimed && clip.type === 'media' && asset?.hasAudio && <AudioSection clip={clip} disabled={track.locked} />}
-
-      {asset && asset.kind !== 'audio' && clip.type === 'media' && <ColorSection clip={clip} asset={asset} disabled={track.locked} />}
-      {asset && asset.kind !== 'audio' && <TransformSection clip={clip} disabled={track.locked} />}
-      <InfoSection clip={clip} track={track} asset={asset} />
-    </div>
-  )
-}
-
-function SpeedSection({ clip, disabled }: { clip: MediaClip; disabled: boolean }): React.JSX.Element {
+export function SpeedSection({ clip, disabled }: { clip: MediaClip; disabled: boolean }): React.JSX.Element {
   const { t } = useTranslation()
   const fps = useProjectStore((s) => s.project.settings.fps)
   // Thử trước từng mức tốc độ: mức nào làm clip đè lên clip phía sau thì cảnh báo trên nút
@@ -90,7 +62,7 @@ function SpeedSection({ clip, disabled }: { clip: MediaClip; disabled: boolean }
   )
 }
 
-function AudioSection({ clip, disabled }: { clip: MediaClip; disabled: boolean }): React.JSX.Element {
+export function AudioSection({ clip, disabled }: { clip: MediaClip; disabled: boolean }): React.JSX.Element {
   const { t } = useTranslation()
   const { fadeIn, fadeOut } = effectiveFades(clip)
   const maxFade = Math.min(MAX_FADE_US, clip.duration)
@@ -137,7 +109,7 @@ function AudioSection({ clip, disabled }: { clip: MediaClip; disabled: boolean }
   )
 }
 
-function InfoSection({ clip, track, asset }: { clip: Clip; track: Track; asset: MediaAsset | undefined }): React.JSX.Element {
+export function InfoSection({ clip, track, asset }: { clip: Clip; track: Track; asset: MediaAsset | undefined }): React.JSX.Element {
   const { t } = useTranslation()
   const fps = useProjectStore((s) => s.project.settings.fps)
   const tc = (us: number): string => formatTimecode(us, fps)

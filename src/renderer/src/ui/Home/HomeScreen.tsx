@@ -6,6 +6,7 @@ import type { ProjectSummary, RecoverableProject } from '@shared/ipc'
 import { formatDuration } from '@shared/project/time'
 import { newProject, openProject, openProjectPath, recoverProject } from '../../state/fileActions'
 import { formatBytes, formatWhen } from '../format'
+import { Icon } from '../icons'
 import { ProjectCard } from './ProjectCard'
 
 type Layout = 'grid' | 'list'
@@ -64,13 +65,6 @@ export function HomeScreen(): React.JSX.Element {
 
   return (
     <div className="home">
-      <header className="home-header">
-        <span className="brand">Cutcap</span>
-        <button onClick={() => void openProject()} title={`${t('home.openOther')} (Ctrl+O)`}>
-          📂 {t('home.openOther')}
-        </button>
-      </header>
-
       <main className="home-body">
         <button className="home-create" onClick={() => void newProject()} title="Ctrl+N">
           <span className="home-create-icon">+</span>
@@ -105,6 +99,9 @@ export function HomeScreen(): React.JSX.Element {
               {t('home.projects')} {projects && <span className="hint">({projects.length})</span>}
             </h2>
             <div className="home-tools">
+              <button onClick={() => void openProject()} title={`${t('home.openOther')} (Ctrl+O)`}>
+                <Icon name="folder" size={15} /> {t('home.openOther')}
+              </button>
               <input
                 className="home-search"
                 type="search"

@@ -1,9 +1,6 @@
 {
   "panels": {
-    "media": "Thư viện media",
-    "preview": "Xem trước",
-    "inspector": "Thuộc tính",
-    "timeline": "Timeline"
+    "preview": "Xem trước"
   },
   "toolbar": {
     "open": "Mở",
@@ -43,11 +40,14 @@
     "dropHint": "Kéo video, ảnh hoặc âm thanh từ Thư viện media thả vào đây",
     "newTrack": "Track {{kind}} mới",
     "split": "Tách",
-    "splitHint": "Tách clip tại đầu phát (Ctrl+B)",
+    "splitHint": "Tách tại đầu phát (Ctrl+B)",
     "delete": "Xóa",
-    "deleteHint": "Xóa clip đang chọn (Delete)",
+    "deleteHint": "Xóa (Delete)",
     "addText": "Thêm chữ",
-    "addTextHint": "Thêm chữ tại đầu phát"
+    "addTextHint": "Thêm chữ tại đầu phát",
+    "trimLeftHint": "Xóa phần bên trái đầu phát (Q)",
+    "trimRightHint": "Xóa phần bên phải đầu phát (W)",
+    "snapHint": "Hít vào mép clip / đầu phát khi kéo (nam châm)"
   },
   "track": {
     "kind": {
@@ -92,7 +92,9 @@
     "transition": "Đổi chuyển cảnh",
     "clipColor": "Đổi màu clip",
     "colorToAll": "Áp màu cho tất cả clip",
-    "relinkMedia": "Tìm lại file media"
+    "relinkMedia": "Tìm lại file media",
+    "trimLeft": "Xóa phần bên trái",
+    "trimRight": "Xóa phần bên phải"
   },
   "status": {
     "loading": "Đang tải…",
@@ -129,10 +131,27 @@
       "ffmpeg-missing": "chưa có FFmpeg (chạy: npm run setup:ffmpeg)"
     },
     "relink": "Tìm lại",
-    "missingNotice": "Không tìm thấy {{count}} file gốc – bấm \"Tìm lại\" trên thẻ để chọn vị trí mới."
+    "missingNotice": "Không tìm thấy {{count}} file gốc – bấm \"Tìm lại\" trên thẻ để chọn vị trí mới.",
+    "search": "Tìm kiếm tệp phương tiện",
+    "searchAudio": "Tìm kiếm âm thanh",
+    "filterTitle": "Lọc theo loại",
+    "dropHintAudio": "Kéo thả nhạc, âm thanh vào đây hoặc bấm để chọn file",
+    "added": "Đã thêm",
+    "addToTimeline": "Thêm vào timeline tại đầu phát (hoặc bấm đúp thẻ)"
   },
   "inspector": {
-    "multiSelected": "Đã chọn {{count}} clip"
+    "multiSelected": "Đã chọn {{count}} clip",
+    "tabs": {
+      "project": "Dự án",
+      "details": "Chi tiết",
+      "video": "Video",
+      "audio": "Âm thanh",
+      "speed": "Tốc độ",
+      "adjust": "Điều chỉnh",
+      "transition": "Chuyển cảnh",
+      "text": "Văn bản",
+      "animation": "Hoạt ảnh"
+    }
   },
   "clip": {
     "track": "Track",
@@ -157,7 +176,8 @@
   "preview": {
     "toStart": "Về đầu (Home)",
     "playPause": "Phát / Dừng (Space)",
-    "toEnd": "Về cuối (End)"
+    "toEnd": "Về cuối (End)",
+    "fullscreen": "Toàn màn hình (Esc để thoát)"
   },
   "export": {
     "title": "Xuất video",
@@ -309,5 +329,57 @@
     "trash": "Chuyển vào Thùng rác",
     "trashConfirm": "Chuyển dự án \"{{name}}\" vào Thùng rác?\nCác file video, ảnh, âm thanh gốc KHÔNG bị xóa.",
     "missingMedia": "Thiếu {{count}} file media"
+  },
+  "titlebar": {
+    "menu": "Menu",
+    "rename": "Bấm để đổi tên dự án",
+    "notSaved": "Chưa lưu",
+    "pending": "Đang lưu…",
+    "autosaved": "Tự động lưu: {{time}}",
+    "newProject": "Dự án mới",
+    "open": "Mở dự án…",
+    "home": "Về Trang chủ",
+    "save": "Lưu",
+    "saveAs": "Lưu thành…",
+    "export": "Xuất"
+  },
+  "leftPanel": {
+    "media": "Tệp phương tiện",
+    "audio": "Âm thanh",
+    "text": "Văn bản",
+    "transitions": "Chuyển tiếp",
+    "filters": "Bộ lọc"
+  },
+  "textPresets": {
+    "heading": "Mẫu văn bản",
+    "addHint": "Bấm để thêm chữ tại đầu phát",
+    "sample": "Văn bản",
+    "default": "Mặc định",
+    "title": "Tiêu đề lớn",
+    "subtitle": "Phụ đề",
+    "yellow": "Vàng nổi bật",
+    "red": "Đỏ viền trắng",
+    "boxed": "Nền trắng",
+    "elegant": "Thanh lịch",
+    "neon": "Viền xanh"
+  },
+  "transitionsTab": {
+    "heading": "Chuyển tiếp",
+    "hint": "Bấm để gắn vào mối cắt gần đầu phát nhất (giữa 2 clip liền nhau).",
+    "noCut": "Chưa có mối cắt nào: đặt 2 clip video/ảnh liền nhau trên cùng một track."
+  },
+  "filtersTab": {
+    "heading": "Bộ lọc",
+    "selectHint": "Chọn một clip video hoặc ảnh trên timeline để áp bộ lọc."
+  },
+  "details": {
+    "size": "Kích thước",
+    "duration": "Thời lượng",
+    "media": "Số media",
+    "clips": "Số clip",
+    "tracks": "Số track",
+    "created": "Tạo lúc",
+    "updated": "Sửa lúc",
+    "location": "Vị trí file"
   }
 }

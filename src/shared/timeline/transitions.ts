@@ -128,3 +128,23 @@ export function applyTransition(draft: Project, clipId: Id, kind: TransitionKind
     duration: Math.round(clamp(duration, MIN_TRANSITION, maxTransitionDuration(prev, found.clip)))
   }
 }
+
+/**
+ * Mối cắt (giữa 2 clip hình liền nhau) gần thời điểm t nhất – dùng cho nút "+" ở tab Chuyển tiếp.
+ * @param preferTrackId ưu tiên track này (track của clip đang chọn) nếu có mối cắt
+ * @returns id clip phía SAU mối cắt (nơi lưu chuyển cảnh), hoặc null nếu dự án chưa có mối cắt nào
+ */
+export function findCutNear(project: Project, t: Micros, preferTrackId?: Id | null): Id | null {
+  let best: { id: Id; distance: number } | null = null
+  const consider = (track: Track): void => {
+    track.clips.forEach((clip, i) => {
+      if (!canHaveTransition(project, track, i)) return
+      const distance = Math.abs(clip.start - t)
+      if (!best || distance < best.distance) best = { id: clip.id, distance }
+    })
+  }
+  const preferred = project.tracks.find((tr) => tr.id === preferTrackId)
+  if (preferred) consider(preferred)
+  if (!best) project.tracks.forEach(consider)
+  return (best as { id: Id } | null)?.id ?? null
+}

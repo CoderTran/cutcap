@@ -13,7 +13,8 @@ import {
   deleteSelected,
   paste,
   selectAll,
-  splitAtPlayhead
+  splitAtPlayhead,
+  trimAtPlayhead
 } from '../state/timelineActions'
 
 interface Shortcut {
@@ -35,6 +36,8 @@ const SHORTCUTS: Shortcut[] = [
   { keys: 'Ctrl+Y', run: redo },
   { keys: 'Ctrl+Shift+Z', run: redo },
   { keys: 'Ctrl+B', run: splitAtPlayhead },
+  { keys: 'Q', run: () => trimAtPlayhead('left') },
+  { keys: 'W', run: () => trimAtPlayhead('right') },
   { keys: 'Delete', run: deleteSelected },
   { keys: 'Backspace', run: deleteSelected },
   { keys: 'Ctrl+C', run: copySelected },

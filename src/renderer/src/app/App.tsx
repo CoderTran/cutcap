@@ -1,16 +1,17 @@
 // Hai màn hình: Trang chủ (danh sách dự án) và trình chỉnh sửa.
-// Bố cục trình chỉnh sửa giống CapCut PC:
-//   ┌──────────┬───────────────┬───────────┐
-//   │  Media   │    Preview    │ Inspector │
-//   ├──────────┴───────────────┴───────────┤
-//   │               Timeline               │
-//   └──────────────────────────────────────┘
-import { useEffect, useState } from 'react'
+// Bố cục trình chỉnh sửa theo CapCut PC:
+//   ┌────────────────────── thanh tiêu đề ──────────────────────┐
+//   ├──────────────┬────────────────────┬──────────────────────┤
+//   │  Bảng trái   │     Xem trước      │      Bảng phải       │
+//   │ (media, chữ…)│                    │   (thuộc tính clip)  │
+//   ├══════════════╧════ thanh kéo ═════╧══════════════════════┤
+//   │                        Timeline                          │
+//   └──────────────────────────────────────────────────────────┘
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { AppInfo } from '@shared/ipc'
 import { useAppStore } from '../state/appStore'
-import { startExportSync } from '../state/exportStore'
 import { startAutosave } from '../state/autosave'
+import { startExportSync } from '../state/exportStore'
 import { handleCloseRequest, openProjectPath } from '../state/fileActions'
 import { startMediaSync } from '../state/mediaActions'
 import { projectStore, selectIsDirty, useProjectStore } from '../state/projectStore'
@@ -18,11 +19,10 @@ import { pruneSelection } from '../state/timelineActions'
 import { ExportDialog } from '../ui/Export/ExportDialog'
 import { HomeScreen } from '../ui/Home/HomeScreen'
 import { Inspector } from '../ui/Inspector/Inspector'
-import { MediaBin } from '../ui/MediaBin/MediaBin'
-import { Panel } from '../ui/Panel'
+import { LeftPanel } from '../ui/LeftPanel/LeftPanel'
 import { PreviewStage } from '../ui/Preview/PreviewStage'
 import { Timeline } from '../ui/Timeline/Timeline'
-import { Toolbar } from '../ui/Toolbar'
+import { TitleBar } from '../ui/TitleBar'
 import { useShortcuts } from './shortcuts'
 
 /** Đồng bộ tiêu đề cửa sổ và trạng thái "chưa lưu" với main process. */
@@ -42,27 +42,17 @@ function useWindowState(): void {
 }
 
 export function App(): React.JSX.Element {
-  const { t } = useTranslation()
-  const [info, setInfo] = useState<AppInfo | null>(null)
   const view = useAppStore((s) => s.view)
 
   useShortcuts()
   useWindowState()
-
-  useEffect(() => {
-    window.cutcap.getAppInfo().then(setInfo).catch(console.error)
-  }, [])
 
   // Đồng bộ thumbnail/proxy cho media trong dự án
   useEffect(() => startMediaSync(), [])
   useEffect(() => startExportSync(), [])
   useEffect(() => startAutosave(), [])
   // Bấm đúp file .cutcap trong Explorer (app đang chạy hoặc vừa mở) → mở file đó
-  useEffect(
-    () =>
-      window.cutcap.onOpenRequested((path) => void openProjectPath(path)),
-    []
-  )
+  useEffect(() => window.cutcap.onOpenRequested((path) => void openProjectPath(path)), [])
 
   // Undo/Redo có thể làm clip đang chọn biến mất → bỏ chọn clip không còn tồn tại
   useEffect(
@@ -86,46 +76,65 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      {view === 'home' ? (
-        <HomeScreen />
-      ) : (
-        <>
-          <Toolbar />
-          <EditorWorkspace />
-        </>
-      )}
-
+      <TitleBar mode={view} />
+      {view === 'home' ? <HomeScreen /> : <EditorWorkspace />}
       <ExportDialog />
-
-      <footer className="statusbar">
-        {info
-          ? `${info.name} · ${t('status.version', { version: info.version })} · Electron ${info.electron} · ${info.platform}`
-          : t('status.loading')}
-      </footer>
     </div>
   )
 }
 
-/** Trình chỉnh sửa: Thư viện media | Xem trước | Thuộc tính, và Timeline bên dưới. */
+const TIMELINE_HEIGHT_KEY = 'cutcap.timelineHeight'
+const MIN_TIMELINE = 160
+const MIN_TOP = 260
+
+function loadTimelineHeight(): number {
+  try {
+    const v = Number(localStorage.getItem(TIMELINE_HEIGHT_KEY))
+    return Number.isFinite(v) && v >= MIN_TIMELINE ? v : 360
+  } catch {
+    return 360
+  }
+}
+
+/** Trình chỉnh sửa: 3 bảng phía trên, timeline phía dưới, thanh kéo để đổi chiều cao timeline. */
 function EditorWorkspace(): React.JSX.Element {
-  const { t } = useTranslation()
+  const [timelineHeight, setTimelineHeight] = useState(loadTimelineHeight)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  const startResize = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const root = rootRef.current
+    if (!root) return
+    e.preventDefault()
+    const startY = e.clientY
+    const startHeight = timelineHeight
+    const max = root.clientHeight - MIN_TOP
+    let latest = startHeight
+    const move = (ev: PointerEvent): void => {
+      latest = Math.round(Math.min(max, Math.max(MIN_TIMELINE, startHeight + startY - ev.clientY)))
+      setTimelineHeight(latest)
+    }
+    const up = (): void => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      try {
+        localStorage.setItem(TIMELINE_HEIGHT_KEY, String(latest))
+      } catch {
+        // không nhớ được cũng không sao
+      }
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
   return (
-      <main className="workspace">
-        <Panel className="area-media" title={t('panels.media')}>
-          <MediaBin />
-        </Panel>
-
-        <Panel className="area-preview" title={t('panels.preview')}>
-          <PreviewStage />
-        </Panel>
-
-        <Panel className="area-inspector" title={t('panels.inspector')}>
-          <Inspector />
-        </Panel>
-
-        <Panel className="area-timeline" title={t('panels.timeline')}>
-          <Timeline />
-        </Panel>
-      </main>
+    <div className="workspace" ref={rootRef} style={{ gridTemplateRows: `minmax(${MIN_TOP}px, 1fr) 6px ${timelineHeight}px` }}>
+      <LeftPanel />
+      <PreviewStage />
+      <Inspector />
+      <div className="row-resizer" onPointerDown={startResize} role="separator" aria-orientation="horizontal" />
+      <section className="panel timeline-panel">
+        <Timeline />
+      </section>
+    </div>
   )
 }

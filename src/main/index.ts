@@ -21,6 +21,9 @@ function createMainWindow(): BrowserWindow {
     backgroundColor: '#16171a',
     title: 'Cutcap',
     autoHideMenuBar: true,
+    // Thanh tiêu đề tự vẽ (giống CapCut); 3 nút thu nhỏ / phóng to / đóng vẫn là của Windows
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#131417', symbolColor: '#d8d9de', height: 38 },
     // Khi dev: lấy icon từ build/. Bản cài đặt dùng icon đã nhúng sẵn trong Cutcap.exe
     ...(app.isPackaged ? {} : { icon: join(app.getAppPath(), 'build', 'icon.png') }),
     webPreferences: {

@@ -5,6 +5,7 @@ import type { Project } from '@shared/project/schema'
 import { appStore } from './appStore'
 import { editorStore } from './editorStore'
 import { pause } from './playbackActions'
+import { currentEntryId } from './history'
 import { projectStore, selectIsDirty } from './projectStore'
 
 /** Tránh mở 2 hộp thoại cùng lúc khi người dùng bấm phím tắt liên tục. */
@@ -33,11 +34,12 @@ function enterEditor(result: { project: Project; filePath: string | null }, opti
 }
 
 /** Ghi dự án ra file. @returns true nếu lưu thành công. */
-async function doSave(saveAs: boolean): Promise<boolean> {
-  const { project, filePath, markSaved } = projectStore.getState()
+export async function doSave(saveAs: boolean): Promise<boolean> {
+  const { project, filePath, history } = projectStore.getState()
+  const entry = currentEntryId(history) // nội dung sắp ghi ứng với bước lịch sử này
   const result = await window.cutcap.saveProject({ project, filePath, saveAs })
   if (!result) return false
-  markSaved(result.filePath, result.savedAt)
+  projectStore.getState().markSaved(result.filePath, result.savedAt, entry)
   return true
 }
 
@@ -119,9 +121,9 @@ export function saveProject(saveAs = false): Promise<boolean | undefined> {
   return exclusive(() => doSave(saveAs))
 }
 
-/** Main process báo người dùng bấm nút X mà còn thay đổi chưa lưu. */
+/** Main process báo người dùng bấm nút X mà còn thay đổi chưa lưu → tự lưu (nếu có file) rồi đóng. */
 export function handleCloseRequest(): Promise<void | undefined> {
   return exclusive(async () => {
-    if (await confirmDiscard()) window.cutcap.closeWindow()
+    if (await leaveCurrentProject()) window.cutcap.closeWindow()
   })
 }

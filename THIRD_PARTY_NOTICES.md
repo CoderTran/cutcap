@@ -22,6 +22,14 @@ của Cutcap và của FFmpeg.
   https://github.com/GregorR/rnnoise-models, chạy bằng bộ lọc `arnndn` của FFmpeg
 - Theo README của kho gốc, các file mô hình không thuộc diện bản quyền. Chi tiết: `resources/models/README.md`
 
+## whisper.cpp & mô hình nhận dạng giọng nói (Phụ đề tự động)
+
+- whisper.cpp – giấy phép **MIT** – https://github.com/ggml-org/whisper.cpp
+  (đóng gói kèm bộ cài ở `resources/whisper/`, nguyên văn giấy phép trong `LICENSE.txt` ở đó)
+- Mô hình dò tiếng nói Silero VAD (bản ggml) – MIT – https://huggingface.co/ggml-org/whisper-vad
+- Mô hình Whisper `ggml-small-q5_1.bin` (OpenAI Whisper, bản ggml) – MIT –
+  https://huggingface.co/ggerganov/whisper.cpp – không đóng gói, app tải về khi dùng lần đầu
+
 ## Electron & Chromium
 
 - Electron – giấy phép MIT – https://github.com/electron/electron

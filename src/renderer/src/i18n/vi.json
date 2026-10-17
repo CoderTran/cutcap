@@ -110,7 +110,8 @@
     "clipAnimDuration": "Thời lượng hiệu ứng động",
     "changeVoice": "Xử lý âm thanh",
     "restoreVoice": "Âm thanh gốc",
-    "loudnorm": "Chuẩn hóa âm lượng"
+    "loudnorm": "Chuẩn hóa âm lượng",
+    "captions": "Tạo phụ đề tự động"
   },
   "status": {
     "loading": "Đang tải…",
@@ -703,5 +704,42 @@
       "failed": "Không xử lý được âm thanh."
     },
     "loudnormShort": "{{measured}} → {{target}} LUFS"
+  },
+  "captions": {
+    "title": "Phụ đề tự động",
+    "language": "Ngôn ngữ nói",
+    "hint": "Nhận dạng lời nói trong tiếng của cả timeline rồi tạo phụ đề tự động. Chạy ngay trên máy, miễn phí, không cần mạng (riêng lần đầu cần tải mô hình nhận dạng khoảng 190 MB). Video dài sẽ mất vài phút.",
+    "replace": "Xóa phụ đề hiện tại",
+    "create": "Tạo",
+    "cancel": "Hủy",
+    "trackName": "Phụ đề",
+    "done": "Đã thêm {{count}} phụ đề lên timeline.",
+    "stage": {
+      "download": "Đang tải mô hình nhận dạng (lần đầu)… {{received}} / {{total}} MB",
+      "prepare": "Đang chuẩn bị âm thanh…",
+      "detect": "Đang tìm đoạn có lời nói…",
+      "recognize": "Đang nhận dạng lời nói…"
+    },
+    "error": {
+      "no-media": "Timeline chưa có video hoặc âm thanh.",
+      "empty": "Không nghe thấy lời nói nào.",
+      "cancelled": "Đã hủy.",
+      "whisper-missing": "Thiếu bộ nhận dạng giọng nói (whisper). Hãy cài lại Cutcap.",
+      "failed": "Tạo phụ đề thất bại. Kiểm tra kết nối mạng (lần đầu cần tải mô hình) rồi thử lại."
+    },
+    "languages": {
+      "vi": "Tiếng Việt",
+      "en": "Tiếng Anh",
+      "auto": "Tự nhận dạng",
+      "zh": "Tiếng Trung",
+      "ja": "Tiếng Nhật",
+      "ko": "Tiếng Hàn",
+      "th": "Tiếng Thái",
+      "fr": "Tiếng Pháp",
+      "es": "Tiếng Tây Ban Nha",
+      "de": "Tiếng Đức",
+      "ru": "Tiếng Nga",
+      "id": "Tiếng Indonesia"
+    }
   }
 }

@@ -215,6 +215,11 @@ export interface TextClip extends ClipBase {
   transform: Transform
   animationIn: TextAnimation
   animationDuration: Micros
+  /**
+   * Chữ do "Phụ đề tự động" tạo (để "Xóa phụ đề hiện tại" chỉ xóa đúng những chữ này).
+   * Trường mới – file cũ không có → false.
+   */
+  caption: boolean
 }
 
 export interface StickerClip extends ClipBase {

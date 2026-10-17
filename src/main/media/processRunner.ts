@@ -7,6 +7,8 @@ export interface RunOptions {
   signal?: AbortSignal
   /** Nhận từng dòng stdout ngay khi có (dùng để đọc tiến trình của ffmpeg). */
   onStdoutLine?: (line: string) => void
+  /** Nhận từng dòng stderr (vd. whisper-cli báo đã xong từng file). */
+  onStderrLine?: (line: string) => void
   /** Thư mục làm việc của tiến trình (vd. thư mục mô hình AI để bộ lọc chỉ cần tên file). */
   cwd?: string
 }
@@ -55,9 +57,16 @@ export function runProcess(exe: string, args: string[], options: RunOptions = {}
       }
     })
     child.stderr.setEncoding('utf8')
+    let errBuffer = ''
     child.stderr.on('data', (chunk: string) => {
       // Chỉ giữ phần cuối – thông báo lỗi thật sự của ffmpeg luôn nằm ở cuối
       stderr = (stderr + chunk).slice(-MAX_OUTPUT)
+      if (options.onStderrLine) {
+        errBuffer += chunk
+        const lines = errBuffer.split(/\r?\n/)
+        errBuffer = lines.pop() ?? ''
+        for (const line of lines) options.onStderrLine(line)
+      }
     })
 
     const onAbort = (): void => {

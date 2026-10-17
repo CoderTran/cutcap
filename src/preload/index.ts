@@ -3,6 +3,7 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import {
   IpcChannels,
+  type CaptionProgress,
   type CutcapApi,
   type ExportProgress,
   type ExportResult,
@@ -57,6 +58,9 @@ const api: CutcapApi = {
   recentRemove: (path) => ipcRenderer.invoke(IpcChannels.recentRemove, path),
   relinkPick: (oldPath) => ipcRenderer.invoke(IpcChannels.relinkPick, oldPath),
   relinkFindInFolder: (folder, oldPaths) => ipcRenderer.invoke(IpcChannels.relinkFindInFolder, folder, oldPaths),
+  generateCaptions: (project, language) => ipcRenderer.invoke(IpcChannels.captionsGenerate, project, language),
+  cancelCaptions: () => ipcRenderer.send(IpcChannels.captionsCancel),
+  onCaptionProgress: (callback) => subscribe<[CaptionProgress]>(IpcChannels.captionsProgress, callback),
 
   libraryList: () => ipcRenderer.invoke(IpcChannels.libraryList),
   libraryCreate: () => ipcRenderer.invoke(IpcChannels.libraryCreate),

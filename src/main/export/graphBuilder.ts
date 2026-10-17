@@ -410,7 +410,29 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
   }
   filters.push(`[${current}]format=${opts.pixelFormat}[vout]`)
 
-  // ───────── TIẾNG ─────────
+  filters.push(...audioMixStatements(project, D, addInput, addDubInput))
+
+  return {
+    inputArgs,
+    // Mỗi chuỗi lọc một dòng cho dễ đọc khi cần gỡ lỗi (FFmpeg chấp nhận ";" kèm xuống dòng)
+    filterGraph: filters.join(';\n'),
+    videoLabel: 'vout',
+    audioLabel: 'aout',
+    durationUs: D
+  }
+}
+
+/**
+ * Phần TIẾNG của lệnh xuất: mỗi clip có tiếng → cắt đúng đoạn, đổi tốc độ, âm lượng/fade, dời tới đúng chỗ,
+ * rồi trộn tất cả thành nhãn [aout] dài đúng D. Dùng chung cho xuất video và cho Phụ đề tự động.
+ */
+function audioMixStatements(
+  project: Project,
+  D: Micros,
+  addInput: (item: Item) => InputInfo,
+  addDubInput: (clip: MediaClip, asset: MediaAsset) => InputInfo
+): string[] {
+  const filters: string[] = []
   const audioLabels: string[] = []
   for (const track of project.tracks) {
     if (track.muted) continue
@@ -463,12 +485,21 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
     )
   }
 
-  return {
-    inputArgs,
-    // Mỗi chuỗi lọc một dòng cho dễ đọc khi cần gỡ lỗi (FFmpeg chấp nhận ";" kèm xuống dòng)
-    filterGraph: filters.join(';\n'),
-    videoLabel: 'vout',
-    audioLabel: 'aout',
-    durationUs: D
+  return filters
+}
+
+/**
+ * Chỉ trộn TIẾNG của cả timeline (không dựng hình) – dùng cho Phụ đề tự động.
+ * Mỗi clip đọc đúng đoạn cắt của nó; kết quả là nhãn [aout] dài đúng thời lượng dự án.
+ */
+export function buildAudioMixGraph(project: Project): Omit<ExportGraph, 'videoLabel'> {
+  const D = projectDuration(project)
+  const inputArgs: string[] = []
+  let inputCount = 0
+  const read = (clip: MediaClip, asset: MediaAsset): InputInfo => {
+    inputArgs.push('-ss', sec(clip.sourceIn), '-t', sec(Math.round(clip.duration * clip.speed)), '-i', asset.path)
+    return { index: inputCount++, sourceOffset: 0, padStart: 0 }
   }
+  const filters = audioMixStatements(project, D, ({ clip, asset }) => read(clip as MediaClip, asset), read)
+  return { inputArgs, filterGraph: filters.join(';\n'), audioLabel: 'aout', durationUs: D }
 }

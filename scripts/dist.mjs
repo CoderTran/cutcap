@@ -22,6 +22,8 @@ function fail(message) {
 for (const [file, hint] of [
   ['resources/ffmpeg/ffmpeg.exe', 'npm run setup:ffmpeg'],
   ['resources/ffmpeg/ffmpeg-build.json', 'npm run setup:ffmpeg'],
+  ['resources/whisper/whisper-cli.exe', 'npm run setup:whisper'],
+  ['resources/whisper/whisper-build.json', 'npm run setup:whisper'],
   ['build/icon.png', 'npm run icons'],
   ['build/file-icon.ico', 'npm run icons'],
   ['LICENSE', 'chép LICENSE (GPL-3.0) vào thư mục dự án']

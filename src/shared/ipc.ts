@@ -1,5 +1,6 @@
 // Tên các kênh IPC (giao tiếp giữa giao diện và tiến trình chính).
 // Đặt ở một chỗ để main và preload luôn dùng cùng một tên, tránh gõ sai.
+import type { Caption, CaptionLanguage } from './captions/captions'
 import type { AudioDerive } from './media/derived'
 import type { FrameRate, MediaAsset, Project, Resolution } from './project/schema'
 
@@ -40,7 +41,10 @@ export const IpcChannels = {
   libraryRename: 'library:rename',
   libraryDuplicate: 'library:duplicate',
   libraryTrash: 'library:trash',
-  libraryReveal: 'library:reveal'
+  libraryReveal: 'library:reveal',
+  captionsGenerate: 'captions:generate',
+  captionsCancel: 'captions:cancel',
+  captionsProgress: 'captions:progress'
 } as const
 
 /** Thông tin cơ bản về ứng dụng, hiển thị ở thanh trạng thái. */
@@ -113,6 +117,21 @@ export type MediaImportErrorCode = 'unsupported' | 'unreadable' | 'missing' | 'f
 export type ExtractAudioResult =
   | { ok: true; path: string }
   | { ok: false; error: 'no-audio' | 'mono' | 'missing' | 'ffmpeg-missing' | 'failed'; detail?: string }
+
+/** Tiến trình tạo phụ đề tự động. */
+export interface CaptionProgress {
+  /** download: tải mô hình (lần đầu) · prepare: trộn tiếng · detect: tìm đoạn có lời · recognize: nhận dạng */
+  stage: 'download' | 'prepare' | 'detect' | 'recognize'
+  /** 0–1 trong bước hiện tại */
+  fraction: number
+  /** Chỉ có khi tải mô hình (byte). */
+  received?: number
+  total?: number
+}
+
+export type CaptionResult =
+  | { ok: true; captions: Caption[] }
+  | { ok: false; error: 'whisper-missing' | 'cancelled' | 'failed'; detail?: string }
 
 export type ImportMediaResult =
   | { ok: true; asset: MediaAsset }
@@ -273,4 +292,9 @@ export interface CutcapApi {
   libraryTrash(path: string): Promise<void>
   /** Mở File Explorer tại file dự án. */
   libraryReveal(path: string): void
+
+  /** Phụ đề tự động: nhận dạng lời nói trong tiếng của cả timeline (lần đầu tự tải mô hình). */
+  generateCaptions(project: Project, language: CaptionLanguage): Promise<CaptionResult>
+  cancelCaptions(): void
+  onCaptionProgress(callback: (progress: CaptionProgress) => void): () => void
 }

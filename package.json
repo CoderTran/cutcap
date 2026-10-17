@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "setup:ffmpeg": "node scripts/setup-ffmpeg.mjs",
+    "setup:whisper": "node scripts/setup-whisper.mjs",
     "icons": "node scripts/make-icons.mjs",
     "dist": "node scripts/dist.mjs"
   },

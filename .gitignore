@@ -9,6 +9,12 @@ resources/ffmpeg/*.exe
 resources/ffmpeg/*.dll
 resources/ffmpeg/LICENSE.txt
 resources/ffmpeg/ffmpeg-build.json
+# whisper.cpp (Phụ đề tự động) – xem resources/whisper/README.md
+resources/whisper/*.exe
+resources/whisper/*.dll
+resources/whisper/*.bin
+resources/whisper/LICENSE.txt
+resources/whisper/whisper-build.json
 # File hệ thống Windows / OneDrive
 Thumbs.db
 desktop.ini

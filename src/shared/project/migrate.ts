@@ -229,7 +229,8 @@ function parseClip(v: unknown, where: string): Clip {
           backgroundColor: nullableStr(s.backgroundColor)
         },
         animationIn: oneOf(v.animationIn, TEXT_ANIMATIONS, 'none'),
-        animationDuration: micros(v.animationDuration, 500_000)
+        animationDuration: micros(v.animationDuration, 500_000),
+        caption: v.caption === true
       }
     }
     case 'sticker':

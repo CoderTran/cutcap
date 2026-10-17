@@ -29,6 +29,16 @@ extraResources:
     to: models
     filter:
       - '*.rnnn'
+  # whisper.cpp + mô hình dò tiếng nói cho "Phụ đề tự động" → <thư mục cài>/resources/whisper/
+  # (mô hình nhận dạng ~190 MB không đóng gói – app tự tải khi dùng lần đầu)
+  - from: resources/whisper
+    to: whisper
+    filter:
+      - '*.exe'
+      - '*.dll'
+      - '*.bin'
+      - LICENSE.txt
+      - whisper-build.json
 extraFiles:
   - LICENSE
   - THIRD_PARTY_NOTICES.md

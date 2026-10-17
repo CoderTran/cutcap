@@ -110,7 +110,8 @@
     "clipAnimDuration": "Animation duration",
     "changeVoice": "Process audio",
     "restoreVoice": "Original audio",
-    "loudnorm": "Normalize loudness"
+    "loudnorm": "Normalize loudness",
+    "captions": "Auto captions"
   },
   "status": {
     "loading": "Loading…",
@@ -703,5 +704,42 @@
       "failed": "Could not process the audio."
     },
     "loudnormShort": "{{measured}} → {{target}} LUFS"
+  },
+  "captions": {
+    "title": "Auto captions",
+    "language": "Spoken language",
+    "hint": "Recognizes speech in the whole timeline's audio and creates captions automatically. Runs on your computer, free, no internet needed (except the first time, to download the ~190 MB speech model). Long videos take a few minutes.",
+    "replace": "Remove current captions",
+    "create": "Create",
+    "cancel": "Cancel",
+    "trackName": "Captions",
+    "done": "Added {{count}} captions to the timeline.",
+    "stage": {
+      "download": "Downloading speech model (first time)… {{received}} / {{total}} MB",
+      "prepare": "Preparing audio…",
+      "detect": "Finding speech…",
+      "recognize": "Recognizing speech…"
+    },
+    "error": {
+      "no-media": "The timeline has no video or audio yet.",
+      "empty": "No speech was found.",
+      "cancelled": "Cancelled.",
+      "whisper-missing": "Speech recognizer (whisper) is missing. Please reinstall Cutcap.",
+      "failed": "Could not create captions. Check your internet connection (the model is downloaded the first time) and try again."
+    },
+    "languages": {
+      "vi": "Vietnamese",
+      "en": "English",
+      "auto": "Detect automatically",
+      "zh": "Chinese",
+      "ja": "Japanese",
+      "ko": "Korean",
+      "th": "Thai",
+      "fr": "French",
+      "es": "Spanish",
+      "de": "German",
+      "ru": "Russian",
+      "id": "Indonesian"
+    }
   }
 }

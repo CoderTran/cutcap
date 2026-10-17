@@ -1,5 +1,6 @@
 // Phím tắt toàn ứng dụng. Thêm phím tắt mới = thêm 1 dòng vào SHORTCUTS.
 import { useEffect } from 'react'
+import { appStore } from '../state/appStore'
 import { editorStore } from '../state/editorStore'
 import { openExportDialog } from '../state/exportStore'
 import { newProject, openProject, saveProject } from '../state/fileActions'
@@ -21,11 +22,13 @@ interface Shortcut {
   run: () => void
   /** true = vẫn chạy khi đang gõ trong ô nhập chữ (mặc định: không). */
   allowInInput?: boolean
+  /** true = dùng được ở Trang chủ (mặc định: chỉ trong trình chỉnh sửa). */
+  onHome?: boolean
 }
 
 const SHORTCUTS: Shortcut[] = [
-  { keys: 'Ctrl+N', run: () => void newProject() },
-  { keys: 'Ctrl+O', run: () => void openProject() },
+  { keys: 'Ctrl+N', run: () => void newProject(), onHome: true },
+  { keys: 'Ctrl+O', run: () => void openProject(), onHome: true },
   { keys: 'Ctrl+S', run: () => void saveProject(false), allowInInput: true },
   { keys: 'Ctrl+Shift+S', run: () => void saveProject(true), allowInInput: true },
   { keys: 'Ctrl+Z', run: undo },
@@ -99,6 +102,7 @@ export function useShortcuts(): void {
       const keys = eventToKeys(e)
       const shortcut = SHORTCUTS.find((s) => s.keys === keys)
       if (!shortcut) return
+      if (appStore.getState().view === 'home' && !shortcut.onHome) return
       // Đang mở hộp thoại (vd. Xuất video) → không để phím tắt tác động lên timeline phía sau
       if (document.querySelector('[aria-modal="true"]')) return
       if (!shortcut.allowInInput && belongsToFocusedControl(e)) return

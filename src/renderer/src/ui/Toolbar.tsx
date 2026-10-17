@@ -1,7 +1,7 @@
 // Thanh công cụ trên cùng: tệp (Mới / Mở / Lưu), Undo/Redo, tên dự án, nút Xuất.
 import { useTranslation } from 'react-i18next'
 import { openExportDialog, useExportStore } from '../state/exportStore'
-import { newProject, openProject, saveProject } from '../state/fileActions'
+import { goHome, openProject, saveProject } from '../state/fileActions'
 import { redo, undo } from '../state/projectActions'
 import {
   selectCanRedo,
@@ -28,8 +28,8 @@ export function Toolbar(): React.JSX.Element {
       <span className="brand">Cutcap</span>
 
       <div className="toolbar-group">
-        <button onClick={() => void newProject()} title={`${t('toolbar.newProject')} (Ctrl+N)`}>
-          {t('toolbar.newProject')}
+        <button onClick={() => void goHome()} title={t('toolbar.homeHint')}>
+          ⌂ {t('toolbar.home')}
         </button>
         <button onClick={() => void openProject()} title={`${t('toolbar.open')} (Ctrl+O)`}>
           {t('toolbar.open')}

@@ -1058,6 +1058,220 @@ button.small {
   font-size: 11px;
 }
 
+/* ---------- Trang chủ ---------- */
+.home {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+.home-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px max(24px, calc((100% - 1200px) / 2));
+}
+.home-create {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  height: 140px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #062830;
+  background: linear-gradient(120deg, #4fd6ee 0%, #22c3e6 45%, #9fe8f5 100%);
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px #22c3e630;
+}
+.home-create:hover:not(:disabled) {
+  background: linear-gradient(120deg, #66def2 0%, #3ccbea 45%, #b3eef8 100%);
+}
+.home-create-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  font-size: 22px;
+  color: #fff;
+  background: #062830;
+  border-radius: 6px;
+}
+.recover-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: #26272c;
+  border-radius: 6px;
+}
+.recover-item b,
+.recover-item small {
+  display: block;
+}
+.recover-item small {
+  color: var(--text-dim);
+}
+.home-projects {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.home-projects-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.home-projects-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.home-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.home-search {
+  width: 220px;
+}
+.home-empty {
+  padding: 40px 0;
+  text-align: center;
+}
+
+/* Lưới / danh sách dự án */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 18px 14px;
+}
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.project-card {
+  position: relative;
+  cursor: pointer;
+  border-radius: 8px;
+  outline: none;
+}
+.project-card.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.project-card.list {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 6px;
+}
+.project-card.list:hover,
+.project-card.list:focus-visible {
+  background: #ffffff0a;
+}
+.project-thumb {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, #2a2b30, #1b1c20);
+  border: 2px solid transparent;
+  border-radius: 8px;
+}
+.project-card:hover .project-thumb,
+.project-card:focus-visible .project-thumb {
+  border-color: var(--accent);
+}
+.project-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.project-thumb-icon {
+  font-size: 30px;
+  opacity: 0.5;
+}
+.project-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.project-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.project-info small {
+  color: var(--text-dim);
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.project-menu {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.project-card.list .project-menu {
+  position: relative;
+  top: auto;
+  right: auto;
+}
+.project-menu-button {
+  opacity: 0;
+  background: #000000b0;
+}
+.project-card:hover .project-menu-button,
+.project-menu-button:focus-visible {
+  opacity: 1;
+}
+.menu-popup {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  margin-top: 4px;
+  background: var(--panel-header);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px #00000080;
+}
+.menu-popup button {
+  text-align: left;
+  background: transparent;
+  border: none;
+}
+.menu-popup button:hover {
+  background: #ffffff12 !important;
+}
+.menu-popup button.danger {
+  color: #ff7b7b;
+}
+
 /* ---------- Hộp thoại (modal) ---------- */
 .modal-backdrop {
   position: fixed;

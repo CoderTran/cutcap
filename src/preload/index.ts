@@ -54,7 +54,14 @@ const api: CutcapApi = {
   recentList: () => ipcRenderer.invoke(IpcChannels.recentList),
   recentRemove: (path) => ipcRenderer.invoke(IpcChannels.recentRemove, path),
   relinkPick: (oldPath) => ipcRenderer.invoke(IpcChannels.relinkPick, oldPath),
-  relinkFindInFolder: (folder, oldPaths) => ipcRenderer.invoke(IpcChannels.relinkFindInFolder, folder, oldPaths)
+  relinkFindInFolder: (folder, oldPaths) => ipcRenderer.invoke(IpcChannels.relinkFindInFolder, folder, oldPaths),
+
+  libraryList: () => ipcRenderer.invoke(IpcChannels.libraryList),
+  libraryCreate: () => ipcRenderer.invoke(IpcChannels.libraryCreate),
+  libraryRename: (path, name) => ipcRenderer.invoke(IpcChannels.libraryRename, path, name),
+  libraryDuplicate: (path, copySuffix) => ipcRenderer.invoke(IpcChannels.libraryDuplicate, path, copySuffix),
+  libraryTrash: (path) => ipcRenderer.invoke(IpcChannels.libraryTrash, path),
+  libraryReveal: (path) => ipcRenderer.send(IpcChannels.libraryReveal, path)
 }
 
 contextBridge.exposeInMainWorld('cutcap', api)

@@ -6,14 +6,15 @@
     "timeline": "Timeline"
   },
   "toolbar": {
-    "newProject": "New project",
     "open": "Open",
     "save": "Save",
     "saveAs": "Save as…",
     "undo": "Undo",
     "redo": "Redo",
     "export": "Export",
-    "exportRunning": "Exporting – click to view"
+    "exportRunning": "Exporting – click to view",
+    "home": "Home",
+    "homeHint": "Save and go to Home"
   },
   "project": {
     "untitled": "Untitled project",
@@ -282,19 +283,31 @@
     "dramatic": "Dramatic",
     "sunset": "Sunset"
   },
-  "start": {
-    "title": "Welcome to Cutcap",
-    "new": "New project",
-    "open": "Open project…",
-    "recent": "Recent projects",
-    "noRecent": "No projects yet.",
-    "remove": "Remove from list",
-    "close": "Close",
+  "home": {
+    "create": "New project",
+    "openOther": "Open other project…",
+    "projects": "Projects",
+    "search": "Search projects",
+    "grid": "Grid",
+    "list": "List",
+    "loading": "Loading…",
+    "empty": "No projects yet. Click \"New project\" to start.",
+    "noMatch": "No matching projects.",
+    "today": "Today",
+    "yesterday": "Yesterday",
     "recoverTitle": "Recover unsaved project",
     "recoverText": "Cutcap was closed with unsaved changes last time. Do you want to open the auto-saved copy?",
     "recover": "Recover",
-    "discard": "Discard",
-    "savedAt": "Auto-saved at {{time}}",
-    "neverSaved": "Never saved"
+    "discardRecovery": "Discard",
+    "autosavedAt": "Auto-saved {{time}}",
+    "more": "More",
+    "open": "Open",
+    "rename": "Rename",
+    "duplicate": "Duplicate",
+    "copySuffix": "(copy)",
+    "reveal": "Show in folder",
+    "trash": "Move to Recycle Bin",
+    "trashConfirm": "Move project \"{{name}}\" to the Recycle Bin?\nYour source videos, images and audio are NOT deleted.",
+    "missingMedia": "{{count}} media files missing"
   }
 }

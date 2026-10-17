@@ -74,9 +74,9 @@ function registerIpcHandlers(): void {
     node: process.versions.node,
     platform: `${process.platform}-${process.arch}`
   }))
-  registerProjectHandlers()
   registerCloseGuardHandlers()
   const media = registerMediaHandlers()
+  registerProjectHandlers(media.hasTools() ? media.ffmpegExe : null)
   registerExportHandlers(media.ffmpegExe)
 }
 

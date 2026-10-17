@@ -1,4 +1,4 @@
-// Danh sách dự án mở gần đây (tối đa 10), lưu trong %APPDATA%\Cutcap\recent.json.
+// Danh sách dự án mở gần đây (tối đa 50), lưu trong %APPDATA%\Cutcap\recent.json.
 // Không import electron → test được.
 import { existsSync } from 'node:fs'
 import { mkdir, readFile } from 'node:fs/promises'
@@ -7,7 +7,8 @@ import { samePath } from '@shared/media/formats'
 import type { RecentProject } from '@shared/ipc'
 import { writeTextAtomic } from './projectIO'
 
-const MAX_RECENT = 10
+/** Dự án mở ở ngoài thư mục mặc định cũng hiện trên Trang chủ nhờ danh sách này. */
+const MAX_RECENT = 50
 
 export class RecentStore {
   constructor(private readonly file: string) {}

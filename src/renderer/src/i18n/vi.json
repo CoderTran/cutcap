@@ -6,14 +6,15 @@
     "timeline": "Timeline"
   },
   "toolbar": {
-    "newProject": "Dự án mới",
     "open": "Mở",
     "save": "Lưu",
     "saveAs": "Lưu thành…",
     "undo": "Hoàn tác",
     "redo": "Làm lại",
     "export": "Xuất video",
-    "exportRunning": "Đang xuất video – bấm để xem"
+    "exportRunning": "Đang xuất video – bấm để xem",
+    "home": "Trang chủ",
+    "homeHint": "Lưu và về Trang chủ"
   },
   "project": {
     "untitled": "Dự án chưa đặt tên",
@@ -282,19 +283,31 @@
     "dramatic": "Kịch tính",
     "sunset": "Hoàng hôn"
   },
-  "start": {
-    "title": "Chào mừng đến với Cutcap",
-    "new": "Dự án mới",
-    "open": "Mở dự án…",
-    "recent": "Dự án gần đây",
-    "noRecent": "Chưa có dự án nào.",
-    "remove": "Bỏ khỏi danh sách",
-    "close": "Đóng",
+  "home": {
+    "create": "Tạo dự án",
+    "openOther": "Mở dự án khác…",
+    "projects": "Dự án",
+    "search": "Tìm dự án",
+    "grid": "Dạng lưới",
+    "list": "Dạng danh sách",
+    "loading": "Đang tải…",
+    "empty": "Chưa có dự án nào. Bấm \"Tạo dự án\" để bắt đầu.",
+    "noMatch": "Không có dự án nào khớp.",
+    "today": "Hôm nay",
+    "yesterday": "Hôm qua",
     "recoverTitle": "Khôi phục dự án chưa lưu",
     "recoverText": "Lần trước Cutcap đã bị tắt khi còn thay đổi chưa lưu. Bạn có muốn mở lại bản tự động lưu không?",
     "recover": "Khôi phục",
-    "discard": "Bỏ qua",
-    "savedAt": "Tự động lưu lúc {{time}}",
-    "neverSaved": "Dự án chưa từng được lưu"
+    "discardRecovery": "Bỏ qua",
+    "autosavedAt": "Tự động lưu lúc {{time}}",
+    "more": "Thêm",
+    "open": "Mở",
+    "rename": "Đổi tên",
+    "duplicate": "Nhân bản",
+    "copySuffix": "(bản sao)",
+    "reveal": "Hiện trong thư mục",
+    "trash": "Chuyển vào Thùng rác",
+    "trashConfirm": "Chuyển dự án \"{{name}}\" vào Thùng rác?\nCác file video, ảnh, âm thanh gốc KHÔNG bị xóa.",
+    "missingMedia": "Thiếu {{count}} file media"
   }
 }

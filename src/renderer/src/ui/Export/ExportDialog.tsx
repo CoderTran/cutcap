@@ -17,14 +17,10 @@ import {
 } from '../../state/exportStore'
 import { updateSettings } from '../../state/projectActions'
 import { useProjectStore } from '../../state/projectStore'
+import { formatBytes } from '../format'
 
 const QUALITIES: ExportQuality[] = ['high', 'standard', 'small']
 
-/** 12345678 → "11,8 MB" */
-function formatBytes(bytes: number): string {
-  const mb = bytes / 1024 / 1024
-  return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(1)} MB`
-}
 const formatSeconds = (s: number): string => formatDuration(Math.round(s) * 1_000_000)
 
 export function ExportDialog(): React.JSX.Element | null {

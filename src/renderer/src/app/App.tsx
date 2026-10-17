@@ -1,12 +1,14 @@
-// Bố cục chính giống CapCut PC:
+// Hai màn hình: Trang chủ (danh sách dự án) và trình chỉnh sửa.
+// Bố cục trình chỉnh sửa giống CapCut PC:
 //   ┌──────────┬───────────────┬───────────┐
 //   │  Media   │    Preview    │ Inspector │
 //   ├──────────┴───────────────┴───────────┤
 //   │               Timeline               │
 //   └──────────────────────────────────────┘
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AppInfo } from '@shared/ipc'
+import { useAppStore } from '../state/appStore'
 import { startExportSync } from '../state/exportStore'
 import { startAutosave } from '../state/autosave'
 import { handleCloseRequest, openProjectPath } from '../state/fileActions'
@@ -14,7 +16,7 @@ import { startMediaSync } from '../state/mediaActions'
 import { projectStore, selectIsDirty, useProjectStore } from '../state/projectStore'
 import { pruneSelection } from '../state/timelineActions'
 import { ExportDialog } from '../ui/Export/ExportDialog'
-import { StartDialog } from '../ui/Start/StartDialog'
+import { HomeScreen } from '../ui/Home/HomeScreen'
 import { Inspector } from '../ui/Inspector/Inspector'
 import { MediaBin } from '../ui/MediaBin/MediaBin'
 import { Panel } from '../ui/Panel'
@@ -28,11 +30,12 @@ function useWindowState(): void {
   const { t } = useTranslation()
   const name = useProjectStore((s) => s.project.name)
   const dirty = useProjectStore(selectIsDirty)
+  const view = useAppStore((s) => s.view)
 
   useEffect(() => {
-    document.title = `${dirty ? '● ' : ''}${name || t('project.untitled')} – Cutcap`
+    document.title = view === 'home' ? 'Cutcap' : `${dirty ? '● ' : ''}${name || t('project.untitled')} – Cutcap`
     window.cutcap.setDirty(dirty)
-  }, [name, dirty, t])
+  }, [name, dirty, view, t])
 
   // Người dùng bấm nút X khi còn thay đổi chưa lưu
   useEffect(() => window.cutcap.onCloseRequested(() => void handleCloseRequest()), [])
@@ -41,8 +44,7 @@ function useWindowState(): void {
 export function App(): React.JSX.Element {
   const { t } = useTranslation()
   const [info, setInfo] = useState<AppInfo | null>(null)
-  const [startOpen, setStartOpen] = useState(true)
-  const closeStart = useCallback(() => setStartOpen(false), [])
+  const view = useAppStore((s) => s.view)
 
   useShortcuts()
   useWindowState()
@@ -58,10 +60,7 @@ export function App(): React.JSX.Element {
   // Bấm đúp file .cutcap trong Explorer (app đang chạy hoặc vừa mở) → mở file đó
   useEffect(
     () =>
-      window.cutcap.onOpenRequested((path) => {
-        setStartOpen(false)
-        void openProjectPath(path)
-      }),
+      window.cutcap.onOpenRequested((path) => void openProjectPath(path)),
     []
   )
 
@@ -87,8 +86,30 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <Toolbar />
+      {view === 'home' ? (
+        <HomeScreen />
+      ) : (
+        <>
+          <Toolbar />
+          <EditorWorkspace />
+        </>
+      )}
 
+      <ExportDialog />
+
+      <footer className="statusbar">
+        {info
+          ? `${info.name} · ${t('status.version', { version: info.version })} · Electron ${info.electron} · ${info.platform}`
+          : t('status.loading')}
+      </footer>
+    </div>
+  )
+}
+
+/** Trình chỉnh sửa: Thư viện media | Xem trước | Thuộc tính, và Timeline bên dưới. */
+function EditorWorkspace(): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
       <main className="workspace">
         <Panel className="area-media" title={t('panels.media')}>
           <MediaBin />
@@ -106,15 +127,5 @@ export function App(): React.JSX.Element {
           <Timeline />
         </Panel>
       </main>
-
-      <ExportDialog />
-      {startOpen && <StartDialog onClose={closeStart} />}
-
-      <footer className="statusbar">
-        {info
-          ? `${info.name} · ${t('status.version', { version: info.version })} · Electron ${info.electron} · ${info.platform}`
-          : t('status.loading')}
-      </footer>
-    </div>
   )
 }

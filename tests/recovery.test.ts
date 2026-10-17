@@ -49,10 +49,10 @@ describe('tự động lưu', () => {
 })
 
 describe('dự án gần đây', () => {
-  it('mới nhất lên đầu, không trùng, bỏ file đã mất, tối đa 10', async () => {
+  it('mới nhất lên đầu, không trùng, bỏ file đã mất, tối đa 50', async () => {
     const recent = new RecentStore(join(dir, 'recent.json'))
     const files = await Promise.all(
-      Array.from({ length: 12 }, async (_, i) => {
+      Array.from({ length: 52 }, async (_, i) => {
         const f = join(dir, `p${i}.cutcap`)
         await writeFile(f, '{}')
         return f
@@ -61,12 +61,12 @@ describe('dự án gần đây', () => {
     for (const [i, f] of files.entries()) await recent.add(f, `Dự án ${i}`)
     await recent.add(files[5].toUpperCase(), 'Mở lại') // cùng file, khác hoa/thường
     const list = await recent.list()
-    expect(list).toHaveLength(10)
+    expect(list).toHaveLength(50)
     expect(list[0].name).toBe('Mở lại')
     expect(list.filter((r) => r.path.toLowerCase() === files[5].toLowerCase())).toHaveLength(1)
 
-    await rm(files[11])
-    expect((await recent.list()).some((r) => r.path === files[11])).toBe(false)
+    await rm(files[51])
+    expect((await recent.list()).some((r) => r.path === files[51])).toBe(false)
   })
 })
 

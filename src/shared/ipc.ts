@@ -31,7 +31,13 @@ export const IpcChannels = {
   recentList: 'recent:list',
   recentRemove: 'recent:remove',
   relinkPick: 'media:relink-pick',
-  relinkFindInFolder: 'media:relink-find'
+  relinkFindInFolder: 'media:relink-find',
+  libraryList: 'library:list',
+  libraryCreate: 'library:create',
+  libraryRename: 'library:rename',
+  libraryDuplicate: 'library:duplicate',
+  libraryTrash: 'library:trash',
+  libraryReveal: 'library:reveal'
 } as const
 
 /** Thông tin cơ bản về ứng dụng, hiển thị ở thanh trạng thái. */
@@ -68,6 +74,21 @@ export interface RecentProject {
   name: string
   /** Lần mở/lưu gần nhất (ISO). */
   openedAt: string
+}
+
+/** Thông tin một dự án để hiện trên màn hình Trang chủ. */
+export interface ProjectSummary {
+  path: string
+  id: string
+  name: string
+  /** Lần sửa cuối (ISO). */
+  updatedAt: string
+  durationUs: number
+  /** Tổng dung lượng các file media dự án dùng. */
+  mediaBytes: number
+  /** Số file media không còn tìm thấy. */
+  missingMedia: number
+  thumbnailUrl: string | null
 }
 
 /** Một bản tự động lưu còn sót lại (app bị tắt ngang). */
@@ -223,4 +244,16 @@ export interface CutcapApi {
   relinkPick(oldPath: string): Promise<string | null>
   /** Tìm các file bị mất (theo tên) trong một thư mục. Trả về đường dẫn cũ → mới. */
   relinkFindInFolder(folder: string, oldPaths: string[]): Promise<Record<string, string>>
+
+  /** Danh sách dự án cho Trang chủ (mới sửa nhất trước). */
+  libraryList(): Promise<ProjectSummary[]>
+  /** Tạo dự án mới trong thư mục dự án mặc định (ghi file ngay). */
+  libraryCreate(): Promise<OpenProjectResult>
+  libraryRename(path: string, name: string): Promise<void>
+  /** Nhân bản dự án; trả về đường dẫn bản sao. */
+  libraryDuplicate(path: string, copySuffix: string): Promise<string>
+  /** Chuyển file dự án vào Thùng rác của Windows (khôi phục được). */
+  libraryTrash(path: string): Promise<void>
+  /** Mở File Explorer tại file dự án. */
+  libraryReveal(path: string): void
 }

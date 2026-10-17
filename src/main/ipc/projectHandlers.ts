@@ -1,6 +1,6 @@
 // Xử lý IPC liên quan tới dự án: mở, lưu, hỏi lưu thay đổi.
 import { basename, join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import {
   IpcChannels,
   type OpenProjectResult,
@@ -11,6 +11,7 @@ import {
 import { ProjectFormatError } from '@shared/project/migrate'
 import { PROJECT_FILE_EXTENSION, type Project } from '@shared/project/schema'
 import { AutosaveStore } from '../project/autosave'
+import { ProjectLibrary } from '../project/library'
 import { readProjectFile, writeProjectFile } from '../project/projectIO'
 import { RecentStore } from '../project/recent'
 import { strings } from '../strings'
@@ -108,9 +109,35 @@ async function askUnsavedChanges(event: IpcMainInvokeEvent, projectName: string)
   return (['save', 'discard', 'cancel'] as const)[response] ?? 'cancel'
 }
 
-export function registerProjectHandlers(): void {
+/**
+ * Thư mục dự án mặc định: Tài liệu\Cutcap Projects.
+ * Biến môi trường CUTCAP_PROJECTS_DIR đổi được chỗ này (kiểm thử, bản chạy từ USB…).
+ */
+export function defaultProjectsDir(): string {
+  return process.env['CUTCAP_PROJECTS_DIR'] || join(app.getPath('documents'), 'Cutcap Projects')
+}
+
+/** @param ffmpegExe dùng để tạo ảnh thu nhỏ dự án (null = không có FFmpeg) */
+export function registerProjectHandlers(ffmpegExe: string | null): void {
   recent = new RecentStore(join(app.getPath('userData'), 'recent.json'))
   autosave = new AutosaveStore(join(app.getPath('userData'), 'autosave'))
+  const library = new ProjectLibrary({
+    projectsDir: defaultProjectsDir(),
+    thumbsDir: join(app.getPath('userData'), 'cache', 'project-thumbs'),
+    recent,
+    ffmpegExe
+  })
+
+  ipcMain.handle(IpcChannels.libraryList, () => library.list())
+  ipcMain.handle(IpcChannels.libraryCreate, () => library.create())
+  ipcMain.handle(IpcChannels.libraryRename, (_e, path: string, name: string) => library.rename(path, name))
+  ipcMain.handle(IpcChannels.libraryDuplicate, (_e, path: string, suffix: string) => library.duplicate(path, suffix))
+  // Thùng rác của Windows (không xóa vĩnh viễn) + bỏ khỏi danh sách gần đây
+  ipcMain.handle(IpcChannels.libraryTrash, async (_e, path: string) => {
+    await shell.trashItem(path)
+    await recent.remove(path)
+  })
+  ipcMain.on(IpcChannels.libraryReveal, (_e, path: string) => shell.showItemInFolder(path))
 
   ipcMain.handle(IpcChannels.openProject, openProject)
   ipcMain.handle(IpcChannels.openProjectPath, (_e, path: string) => openPath(path))

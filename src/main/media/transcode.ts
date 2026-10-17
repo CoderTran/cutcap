@@ -88,6 +88,24 @@ export function waveformArgs(src: string, dest: string): string[] {
 }
 
 /**
+ * Lệnh trích xuất âm thanh từ video ra file .m4a.
+ * Tiếng gốc đã là AAC → chép nguyên (nhanh, không giảm chất lượng); codec khác → mã hóa AAC 192 kbps.
+ * Ghi ra định dạng mp4 tường minh vì file tạm có đuôi ".part" (ffmpeg không đoán được định dạng).
+ */
+export function extractAudioArgs(src: string, dest: string, audioCodec: string | null): string[] {
+  const copy = audioCodec === 'aac'
+  return [
+    '-hide_banner', '-loglevel', 'error', '-y',
+    '-i', src,
+    '-map', '0:a:0', '-vn', '-sn', '-dn',
+    ...(copy ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '192k']),
+    '-movflags', '+faststart',
+    '-f', 'mp4',
+    dest
+  ]
+}
+
+/**
  * Lệnh tạo proxy. Ghi tiến trình ra stdout ("-progress pipe:1") để hiện thanh phần trăm.
  * @param dest đường dẫn file tạm; caller đổi tên sau khi xong (để không bao giờ dùng nhầm file dở dang)
  */

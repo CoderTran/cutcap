@@ -12,6 +12,7 @@ export const IpcChannels = {
   closeWindow: 'window:close',
   pickMediaFiles: 'media:pick-files',
   importMedia: 'media:import',
+  extractAudio: 'media:extract-audio',
   prepareMedia: 'media:prepare',
   mediaUpdated: 'media:updated',
   exportDetectEncoders: 'export:detect-encoders',
@@ -105,6 +106,11 @@ export type UnsavedChoice = 'save' | 'discard' | 'cancel'
 // ───────── Media ─────────
 
 export type MediaImportErrorCode = 'unsupported' | 'unreadable' | 'missing' | 'ffmpeg-missing'
+
+/** Kết quả "Trích xuất âm thanh" từ một video: đường dẫn file .m4a vừa tạo (hoặc đã có sẵn). */
+export type ExtractAudioResult =
+  | { ok: true; path: string }
+  | { ok: false; error: 'no-audio' | 'missing' | 'ffmpeg-missing' | 'failed'; detail?: string }
 
 export type ImportMediaResult =
   | { ok: true; asset: MediaAsset }
@@ -203,10 +209,12 @@ export interface CutcapApi {
   /** Đóng cửa sổ thật sự (sau khi đã xử lý xong việc lưu). */
   closeWindow(): void
 
-  /** Hộp thoại chọn nhiều file media. Trả về [] nếu bấm Hủy. */
-  pickMediaFiles(): Promise<string[]>
+  /** Hộp thoại chọn nhiều file media (only = 'video': chỉ cho chọn video). Trả về [] nếu bấm Hủy. */
+  pickMediaFiles(only?: 'video'): Promise<string[]>
   /** Đọc thông tin các file (ffprobe) để thêm vào dự án. */
   importMedia(paths: string[]): Promise<ImportMediaResult[]>
+  /** Tách tiếng của một video ra file .m4a (trong thư mục "Âm thanh trích xuất"). */
+  extractAudio(videoPath: string): Promise<ExtractAudioResult>
   /** Chuẩn bị thumbnail + bản phát (tạo proxy chạy nền nếu cần). */
   prepareMedia(path: string): Promise<MediaPreview>
   /** Nhận cập nhật khi proxy tiến triển / xong / lỗi. Trả về hàm hủy đăng ký. */

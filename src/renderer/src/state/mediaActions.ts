@@ -1,5 +1,5 @@
 // Lệnh làm việc với media: nhập file (chọn hoặc kéo thả), xóa, và đồng bộ thumbnail/proxy.
-import { samePath } from '@shared/media/formats'
+import { fileNameOf, samePath } from '@shared/media/formats'
 import * as ops from '@shared/project/ops'
 import type { Id, MediaAsset } from '@shared/project/schema'
 import { mediaStore, pathKey, type ImportError } from './mediaStore'
@@ -37,6 +37,44 @@ export async function importPaths(paths: string[]): Promise<void> {
 export async function pickAndImport(): Promise<void> {
   const paths = await window.cutcap.pickMediaFiles()
   if (paths.length > 0) await importPaths(paths)
+}
+
+/**
+ * "Trích xuất âm thanh": tách tiếng của các video ra file .m4a rồi thêm vào thư viện
+ * (hiện ở tab Âm thanh, tên dạng "<tên video> <nameSuffix>"). Cả lần trích xuất = 1 bước Undo.
+ * Video không có tiếng hoặc lỗi → báo trong khung lỗi của thư viện.
+ */
+export async function extractAudioFrom(videoPaths: string[], nameSuffix: string): Promise<void> {
+  if (videoPaths.length === 0) return
+  const media = mediaStore.getState()
+  media.setImporting(true)
+  try {
+    const errors: ImportError[] = []
+    const extracted: { audioPath: string; name: string }[] = []
+    for (const path of videoPaths) {
+      const r = await window.cutcap.extractAudio(path)
+      if (r.ok) extracted.push({ audioPath: r.path, name: `${fileNameOf(path).replace(/\.[^.]+$/, '')} ${nameSuffix}` })
+      else errors.push({ path, error: r.error })
+    }
+
+    const existing = Object.values(projectStore.getState().project.assets)
+    const fresh = extracted.filter((e) => !existing.some((a) => samePath(a.path, e.audioPath)))
+    const results = fresh.length > 0 ? await window.cutcap.importMedia(fresh.map((e) => e.audioPath)) : []
+    const assets: MediaAsset[] = []
+    results.forEach((r, i) => {
+      if (r.ok) assets.push({ ...r.asset, name: fresh[i].name })
+      else errors.push({ path: r.path, error: r.error })
+    })
+    if (assets.length > 0) projectStore.getState().apply('history.extractAudio', (d) => ops.addAssets(d, assets))
+    media.setImportErrors(errors)
+  } finally {
+    media.setImporting(false)
+  }
+}
+
+/** Chọn video trên máy rồi trích xuất âm thanh. */
+export async function pickAndExtractAudio(nameSuffix: string): Promise<void> {
+  await extractAudioFrom(await window.cutcap.pickMediaFiles('video'), nameSuffix)
 }
 
 /** Xóa media khỏi thư viện (chỉ khi không clip nào dùng). @returns true nếu đã xóa */

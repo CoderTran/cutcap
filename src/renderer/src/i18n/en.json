@@ -95,7 +95,8 @@
     "relinkMedia": "Relink media",
     "trimLeft": "Delete left part",
     "trimRight": "Delete right part",
-    "removeEmptyText": "Remove empty text"
+    "removeEmptyText": "Remove empty text",
+    "extractAudio": "Extract audio"
   },
   "status": {
     "loading": "Loading…",
@@ -129,7 +130,9 @@
       "unsupported": "unsupported format",
       "unreadable": "corrupted or unreadable",
       "missing": "file not found",
-      "ffmpeg-missing": "FFmpeg missing (run: npm run setup:ffmpeg)"
+      "ffmpeg-missing": "FFmpeg missing (run: npm run setup:ffmpeg)",
+      "no-audio": "video has no sound",
+      "failed": "could not extract the audio"
     },
     "relink": "Locate",
     "missingNotice": "{{count}} source files not found – click \"Locate\" on a card to pick the new location.",
@@ -384,5 +387,14 @@
     "created": "Created",
     "updated": "Modified",
     "location": "File location"
+  },
+  "extractAudio": {
+    "button": "Extract audio",
+    "working": "Working…",
+    "hint": "Turn the sound of a video into a separate audio file (saved in the \"Âm thanh trích xuất\" folder)",
+    "fromProject": "From videos in this project",
+    "noVideos": "No videos with sound in this project yet.",
+    "fromComputer": "Choose a video on this PC…",
+    "suffix": "(audio)"
   }
 }

@@ -7,6 +7,7 @@ import { handleMediaProtocol } from '../media/mediaProtocol'
 import { MediaService } from '../media/mediaService'
 import { findInFolder } from '../media/relink'
 import { strings } from '../strings'
+import { defaultProjectsDir } from './projectHandlers'
 
 /**
  * Vị trí ffmpeg:
@@ -40,23 +41,37 @@ export function registerMediaHandlers(): MediaService {
 
   handleMediaProtocol((p) => media.isAllowedPath(p))
 
-  ipcMain.handle(IpcChannels.pickMediaFiles, async (event) => {
+  ipcMain.handle(IpcChannels.pickMediaFiles, async (event, only?: 'video') => {
+    // Chỉ dùng cho kiểm thử tự động (hộp thoại hệ thống không điều khiển tự động được)
+    const e2ePaths = process.env['CUTCAP_E2E_PICK_PATHS']
+    if (e2ePaths) return e2ePaths.split('|')
     const win = BrowserWindow.fromWebContents(event.sender)
-    const options: Electron.OpenDialogOptions = {
-      title: strings.importTitle,
-      properties: ['openFile', 'multiSelections'],
-      filters: [
-        { name: strings.filterAllMedia, extensions: [...VIDEO_EXTENSIONS, ...IMAGE_EXTENSIONS, ...AUDIO_EXTENSIONS] },
-        { name: strings.filterVideo, extensions: [...VIDEO_EXTENSIONS] },
-        { name: strings.filterImage, extensions: [...IMAGE_EXTENSIONS] },
-        { name: strings.filterAudio, extensions: [...AUDIO_EXTENSIONS] }
-      ]
-    }
+    const options: Electron.OpenDialogOptions =
+      only === 'video'
+        ? {
+            title: strings.extractAudioTitle,
+            properties: ['openFile', 'multiSelections'],
+            filters: [{ name: strings.filterVideo, extensions: [...VIDEO_EXTENSIONS] }]
+          }
+        : {
+            title: strings.importTitle,
+            properties: ['openFile', 'multiSelections'],
+            filters: [
+              { name: strings.filterAllMedia, extensions: [...VIDEO_EXTENSIONS, ...IMAGE_EXTENSIONS, ...AUDIO_EXTENSIONS] },
+              { name: strings.filterVideo, extensions: [...VIDEO_EXTENSIONS] },
+              { name: strings.filterImage, extensions: [...IMAGE_EXTENSIONS] },
+              { name: strings.filterAudio, extensions: [...AUDIO_EXTENSIONS] }
+            ]
+          }
     const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
     return result.canceled ? [] : result.filePaths
   })
 
   ipcMain.handle(IpcChannels.importMedia, (_event, paths: string[]) => media.importFiles(paths))
+  // File âm thanh trích xuất là dữ liệu của người dùng → để cạnh các dự án, không để trong cache
+  ipcMain.handle(IpcChannels.extractAudio, (_event, videoPath: string) =>
+    media.extractAudio(videoPath, join(defaultProjectsDir(), strings.extractedAudioFolder))
+  )
 
   // Tìm lại file bị mất: hộp thoại mở sẵn ở thư mục cũ (nếu còn), lọc đúng đuôi file cũ
   ipcMain.handle(IpcChannels.relinkPick, async (event, oldPath: string) => {

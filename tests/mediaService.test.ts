@@ -98,6 +98,22 @@ describe.skipIf(!hasFfmpeg)('MediaService với ffmpeg thật', () => {
     expect(png.waveformUrl).toBeNull()
   }, 30_000)
 
+  it('trích xuất âm thanh: ra file .m4a đúng thời lượng; lần sau dùng lại; video không tiếng thì báo lỗi', async () => {
+    const out = join(dir, 'Âm thanh trích xuất')
+    const first = await service.extractAudio(files.mp4, out)
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    expect(first.path.startsWith(out)).toBe(true)
+    expect(first.path).toMatch(/Video thử \(âm thanh [0-9a-f]{6}\)\.m4a$/)
+    const [audio] = await service.importFiles([first.path])
+    expect(audio.ok && audio.asset).toMatchObject({ kind: 'audio', hasAudio: true })
+    expect(audio.ok && Math.abs(audio.asset.durationUs - 2_000_000)).toBeLessThan(100_000)
+
+    expect(await service.extractAudio(files.mp4, out)).toEqual(first) // không trích lại
+    expect(await service.extractAudio(files.mkv, out)).toEqual({ ok: false, error: 'no-audio' })
+    expect(await service.extractAudio(join(dir, 'mất.mp4'), out)).toEqual({ ok: false, error: 'missing' })
+  })
+
   it('chỉ cho đọc file media hoặc file trong cache', () => {
     expect(service.isAllowedPath(files.mp4)).toBe(true)
     expect(service.isAllowedPath(join(dir, 'cache', 'abc', 'thumb.jpg'))).toBe(true)

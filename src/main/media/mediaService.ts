@@ -9,12 +9,12 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, rename, rm, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative } from 'node:path'
-import type { ImportMediaResult, MediaPreview } from '@shared/ipc'
+import type { ExtractAudioResult, ImportMediaResult, MediaPreview } from '@shared/ipc'
 import { fileNameOf, mediaKindFromPath } from '@shared/media/formats'
 import { createId } from '@shared/project/factory'
 import { ProbeError, probeFile, type ProbeInfo } from './probe'
 import { parseProgressLine, runProcess } from './processRunner'
-import { proxyArgs, proxyFileName, proxyNeeded, thumbnailArgs, waveformArgs, type ProxyKind } from './transcode'
+import { extractAudioArgs, proxyArgs, proxyFileName, proxyNeeded, thumbnailArgs, waveformArgs, type ProxyKind } from './transcode'
 import { mediaUrl } from './mediaUrl'
 
 export interface MediaServiceOptions {
@@ -99,6 +99,36 @@ export class MediaService {
         return { ok: false, path, error: code, detail: (err as Error).message }
       }
     })
+  }
+
+  // ───────── Trích xuất âm thanh ─────────
+
+  /**
+   * Tách tiếng của video ra file .m4a trong `destDir` (file người dùng giữ lâu dài, KHÔNG phải cache).
+   * Tên file kèm mã băm của video gốc (đường dẫn + dung lượng + giờ sửa): trích lại cùng một video
+   * thì dùng lại file cũ; hai video trùng tên ở hai thư mục khác nhau không đè lên nhau.
+   */
+  async extractAudio(path: string, destDir: string): Promise<ExtractAudioResult> {
+    if (!existsSync(path)) return { ok: false, error: 'missing' }
+    if (!this.hasTools()) return { ok: false, error: 'ffmpeg-missing' }
+    try {
+      const { cacheKey, info } = await this.probeCached(path)
+      if (!info.hasAudio || info.kind !== 'video') return { ok: false, error: 'no-audio' }
+      const base = fileNameOf(path).replace(/\.[^.]+$/, '')
+      const dest = join(destDir, `${base} (âm thanh ${cacheKey.slice(0, 6)}).m4a`)
+      if (existsSync(dest)) return { ok: true, path: dest }
+      await mkdir(destDir, { recursive: true })
+      const partial = `${dest}.part`
+      try {
+        await runProcess(this.ffmpegExe, extractAudioArgs(path, partial, info.audioCodec))
+        await rename(partial, dest)
+      } finally {
+        await rm(partial, { force: true })
+      }
+      return { ok: true, path: dest }
+    } catch (err) {
+      return { ok: false, error: 'failed', detail: (err as Error).message }
+    }
   }
 
   // ───────── Chuẩn bị để hiển thị ─────────

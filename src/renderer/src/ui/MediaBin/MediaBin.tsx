@@ -8,6 +8,7 @@ import { dismissImportErrors, importPaths, pickAndImport } from '../../state/med
 import { pathKey, useMediaStore } from '../../state/mediaStore'
 import { useProjectStore } from '../../state/projectStore'
 import { Icon } from '../icons'
+import { ExtractAudioButton } from './ExtractAudioButton'
 import { MediaCard } from './MediaCard'
 
 type Filter = 'all' | MediaKind
@@ -82,6 +83,7 @@ export function MediaBin({ only }: { only?: MediaKind }): React.JSX.Element {
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
+        {only === 'audio' && <ExtractAudioButton />}
         {!only && (
           <select className="compact" value={filter} onChange={(e) => setFilter(e.target.value as Filter)} title={t('media.filterTitle')}>
             {FILTERS.map((f) => (

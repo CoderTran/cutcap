@@ -43,7 +43,9 @@ const PATHS = {
   pause: 'M7 5h3v14H7zm7 0h3v14h-3z',
   fullscreen: 'M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5',
   ratio: 'M4 6h16v12H4zm4 4h8',
-  rotate: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4'
+  rotate: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4',
+  // khung video + nốt nhạc tách ra
+  extract: 'M3 5h11v9H3zM18 9v8M18 9l3-1M18 17a2 2 0 1 1-2-2'
 } as const
 
 export type IconName = keyof typeof PATHS

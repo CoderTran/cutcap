@@ -95,7 +95,8 @@
     "relinkMedia": "Tìm lại file media",
     "trimLeft": "Xóa phần bên trái",
     "trimRight": "Xóa phần bên phải",
-    "removeEmptyText": "Xóa chữ trống"
+    "removeEmptyText": "Xóa chữ trống",
+    "extractAudio": "Trích xuất âm thanh"
   },
   "status": {
     "loading": "Đang tải…",
@@ -129,7 +130,9 @@
       "unsupported": "định dạng không hỗ trợ",
       "unreadable": "file hỏng hoặc không đọc được",
       "missing": "không tìm thấy file",
-      "ffmpeg-missing": "chưa có FFmpeg (chạy: npm run setup:ffmpeg)"
+      "ffmpeg-missing": "chưa có FFmpeg (chạy: npm run setup:ffmpeg)",
+      "no-audio": "video không có tiếng",
+      "failed": "không trích xuất được âm thanh"
     },
     "relink": "Tìm lại",
     "missingNotice": "Không tìm thấy {{count}} file gốc – bấm \"Tìm lại\" trên thẻ để chọn vị trí mới.",
@@ -384,5 +387,14 @@
     "created": "Tạo lúc",
     "updated": "Sửa lúc",
     "location": "Vị trí file"
+  },
+  "extractAudio": {
+    "button": "Trích xuất âm thanh",
+    "working": "Đang xử lý…",
+    "hint": "Tách tiếng của một video thành file âm thanh riêng (lưu trong thư mục \"Âm thanh trích xuất\")",
+    "fromProject": "Từ video trong dự án",
+    "noVideos": "Chưa có video nào có tiếng trong dự án.",
+    "fromComputer": "Chọn video trên máy…",
+    "suffix": "(âm thanh)"
   }
 }

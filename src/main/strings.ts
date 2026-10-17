@@ -14,6 +14,9 @@ const vi = {
   btnDiscard: 'Không lưu',
   btnCancel: 'Hủy',
   importTitle: 'Nhập media',
+  extractAudioTitle: 'Chọn video để trích xuất âm thanh',
+  /** Thư mục con (trong thư mục dự án) chứa các file âm thanh tách từ video. */
+  extractedAudioFolder: 'Âm thanh trích xuất',
   filterAllMedia: 'Tất cả media',
   filterVideo: 'Video',
   filterImage: 'Ảnh',

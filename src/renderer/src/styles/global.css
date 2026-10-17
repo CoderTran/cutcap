@@ -549,6 +549,34 @@ kbd {
   background: transparent;
   border: none;
 }
+/* Nút "Trích xuất âm thanh" + menu chọn video */
+.extract-audio {
+  position: relative;
+  flex: none;
+}
+.extract-audio > button {
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+.extract-menu {
+  width: 280px;
+  max-height: 340px;
+  overflow: auto;
+}
+.menu-label {
+  padding: 4px 10px 2px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.menu-empty {
+  padding: 4px 10px 6px;
+  font-size: 12px;
+}
+.menu-item-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .media-count {
   font-size: 12px;
 }

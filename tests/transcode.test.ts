@@ -15,6 +15,7 @@ const baseVideo: ProbeInfo = {
   videoCodec: 'h264',
   pixelFormat: 'yuv420p',
   audioCodec: 'aac',
+  audioChannels: 2,
   formatName: 'mov,mp4'
 }
 

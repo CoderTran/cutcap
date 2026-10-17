@@ -284,6 +284,18 @@ kbd {
 .menu-popup button.danger {
   color: var(--danger);
 }
+/* Menu chuột phải trên timeline: đặt theo vị trí con trỏ */
+.menu-popup.context-menu {
+  position: fixed;
+  right: auto;
+  margin: 0;
+  z-index: 200;
+}
+.context-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 .menu-popup hr {
   width: 100%;
   margin: 4px 0;
@@ -778,6 +790,8 @@ kbd {
 .preview-frame-wrap {
   flex: 1;
   min-height: 0;
+  /* Lớp hình phóng to > 100%: khung chọn không được tràn lên tiêu đề / thanh điều khiển */
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1339,6 +1353,87 @@ kbd {
   transform: translateY(-50%);
   font-weight: 700;
   opacity: 0.6;
+}
+/* Dấu ◆ keyframe trên clip đang chọn */
+.tl-kf {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 11px;
+  height: 11px;
+  margin: -5px 0 0 -5px;
+  padding: 0;
+  background: #fff;
+  border: 1.5px solid var(--accent);
+  border-radius: 1px;
+  transform: rotate(45deg);
+  cursor: ew-resize;
+}
+.tl-kf:hover:not(:disabled) {
+  background: var(--accent);
+}
+/* Đang kéo dấu ◆: giữ con trỏ kéo ngang trên cả cửa sổ */
+body.dragging-keyframe,
+body.dragging-keyframe * {
+  cursor: ew-resize !important;
+}
+/* Nút keyframe ‹ ◇ › trong bảng thuộc tính */
+.kf-controls {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+}
+.slider-head {
+  align-items: center;
+}
+.slider-head > b {
+  margin-left: auto;
+}
+.kf-controls button {
+  width: 18px;
+  height: 20px;
+  padding: 0;
+  font-size: 14px;
+  color: var(--text-dim);
+  background: transparent;
+}
+.kf-controls button:hover:not(:disabled) {
+  color: var(--text);
+  background: transparent;
+}
+.kf-controls .kf-toggle.active,
+.kf-controls.animated .kf-toggle {
+  color: var(--accent);
+  border-color: transparent;
+}
+.position-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pixel-input {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 8px;
+  color: var(--text-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.pixel-input:focus-within {
+  border-color: var(--accent);
+}
+.pixel-input input {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 6px 4px 0;
+  text-align: right;
+  font-family: Consolas, monospace;
+  background: transparent;
+  border: none;
 }
 .tl-fade {
   position: absolute;

@@ -44,6 +44,9 @@ const PATHS = {
   fullscreen: 'M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5',
   ratio: 'M4 6h16v12H4zm4 4h8',
   rotate: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4',
+  copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  cut: 'M6 6a2.5 2.5 0 1 0 0 .01M6 18a2.5 2.5 0 1 0 0 .01M8 7.5 20 17M8 16.5 20 7',
+  paste: 'M9 4h6v3H9zM7 5H5v15h14V5h-2',
   // khung video + nốt nhạc tách ra
   extract: 'M3 5h11v9H3zM18 9v8M18 9l3-1M18 17a2 2 0 1 1-2-2'
 } as const

@@ -18,6 +18,7 @@ import { editorStore, useEditorStore } from '../../state/editorStore'
 import { projectStore, useProjectStore } from '../../state/projectStore'
 import { dropAssetOnTimeline } from '../../state/timelineActions'
 import { ASSET_DRAG_TYPE } from '../MediaBin/MediaCard'
+import { ClipContextMenu } from './ClipContextMenu'
 import { ClipView } from './ClipView'
 import { DROP_ZONE_HEIGHT, HEADER_WIDTH, RULER_HEIGHT, SNAP_PX, TAIL_PADDING_PX, trackHeight, trackOffsets } from './layout'
 import { TimelineToolbar } from './TimelineToolbar'
@@ -59,6 +60,15 @@ export function Timeline(): React.JSX.Element {
   const contentRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState({ left: 0, width: 800 })
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const closeContextMenu = useCallback(() => setContextMenu(null), [])
+  // Chuột phải vào clip chưa chọn → chọn riêng clip đó; clip đã nằm trong vùng chọn → giữ nguyên vùng chọn
+  const onClipContextMenu = useCallback((e: React.MouseEvent, clipId: Id) => {
+    e.preventDefault()
+    const { selectedClipIds, selectClip } = editorStore.getState()
+    if (!selectedClipIds.includes(clipId)) selectClip(clipId)
+    setContextMenu({ x: e.clientX, y: e.clientY })
+  }, [])
   /** Mốc thời gian cần giữ cố định trên màn hình khi zoom (xem useLayoutEffect bên dưới). */
   const zoomAnchor = useRef<{ time: number; screenX: number } | null>(null)
 
@@ -270,6 +280,7 @@ export function Timeline(): React.JSX.Element {
                     locked={track.locked}
                     fps={project.settings.fps}
                     onPointerDown={onClipPointerDown}
+                    onContextMenu={onClipContextMenu}
                   />
                 ))}
                 <TransitionMarkers project={project} track={track} pxPerSecond={pps} />
@@ -339,6 +350,7 @@ export function Timeline(): React.JSX.Element {
           <Playhead />
         </div>
       </div>
+      {contextMenu && <ClipContextMenu x={contextMenu.x} y={contextMenu.y} onClose={closeContextMenu} />}
     </div>
   )
 }

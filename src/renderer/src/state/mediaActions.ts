@@ -1,4 +1,5 @@
 // Lệnh làm việc với media: nhập file (chọn hoặc kéo thả), xóa, và đồng bộ thumbnail/proxy.
+import type { AudioDerive } from '@shared/media/derived'
 import { fileNameOf, samePath } from '@shared/media/formats'
 import * as ops from '@shared/project/ops'
 import type { Id, MediaAsset } from '@shared/project/schema'
@@ -49,27 +50,48 @@ export async function extractAudioFrom(videoPaths: string[], nameSuffix: string)
   const media = mediaStore.getState()
   media.setImporting(true)
   try {
-    const errors: ImportError[] = []
-    const extracted: { audioPath: string; name: string }[] = []
-    for (const path of videoPaths) {
-      const r = await window.cutcap.extractAudio(path)
-      if (r.ok) extracted.push({ audioPath: r.path, name: `${fileNameOf(path).replace(/\.[^.]+$/, '')} ${nameSuffix}` })
-      else errors.push({ path, error: r.error })
-    }
-
-    const existing = Object.values(projectStore.getState().project.assets)
-    const fresh = extracted.filter((e) => !existing.some((a) => samePath(a.path, e.audioPath)))
-    const results = fresh.length > 0 ? await window.cutcap.importMedia(fresh.map((e) => e.audioPath)) : []
-    const assets: MediaAsset[] = []
-    results.forEach((r, i) => {
-      if (r.ok) assets.push({ ...r.asset, name: fresh[i].name })
-      else errors.push({ path: r.path, error: r.error })
-    })
-    if (assets.length > 0) projectStore.getState().apply('history.extractAudio', (d) => ops.addAssets(d, assets))
+    const { byVideo, errors } = await extractAudioAssets(videoPaths, nameSuffix)
+    const existing = projectStore.getState().project.assets
+    const fresh = [...new Map([...byVideo.values()].filter((a) => !existing[a.id]).map((a) => [a.id, a])).values()]
+    if (fresh.length > 0) projectStore.getState().apply('history.extractAudio', (d) => ops.addAssets(d, fresh))
     media.setImportErrors(errors)
   } finally {
     media.setImporting(false)
   }
+}
+
+/**
+ * Trích xuất (hoặc xóa giọng – mode 'karaoke') + đọc thông tin file âm thanh tạo ra (CHƯA thêm vào dự án).
+ * File đã có trong thư viện thì trả về đúng media đó (không nhập trùng).
+ * @returns byVideo: khóa = pathKey(đường dẫn video)
+ */
+export async function extractAudioAssets(
+  videoPaths: string[],
+  nameSuffix: string,
+  mode: AudioDerive = 'extract'
+): Promise<{ byVideo: Map<string, MediaAsset>; errors: ImportError[] }> {
+  const errors: ImportError[] = []
+  const byVideo = new Map<string, MediaAsset>()
+  const toImport: { video: string; audioPath: string; name: string }[] = []
+  const existing = Object.values(projectStore.getState().project.assets)
+
+  for (const video of new Set(videoPaths)) {
+    const r = await window.cutcap.extractAudio(video, mode)
+    if (!r.ok) {
+      errors.push({ path: video, error: r.error })
+      continue
+    }
+    const known = existing.find((a) => samePath(a.path, r.path))
+    if (known) byVideo.set(pathKey(video), known)
+    else toImport.push({ video, audioPath: r.path, name: `${fileNameOf(video).replace(/\.[^.]+$/, '')} ${nameSuffix}` })
+  }
+
+  const results = toImport.length > 0 ? await window.cutcap.importMedia(toImport.map((e) => e.audioPath)) : []
+  results.forEach((r, i) => {
+    if (r.ok) byVideo.set(pathKey(toImport[i].video), { ...r.asset, name: toImport[i].name })
+    else errors.push({ path: r.path, error: r.error })
+  })
+  return { byVideo, errors }
 }
 
 /** Chọn video trên máy rồi trích xuất âm thanh. */

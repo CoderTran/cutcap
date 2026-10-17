@@ -4,6 +4,7 @@
 // Nhờ vậy chữ trong video xuất ra giống hệt preview: cùng font Windows, cùng dấu tiếng Việt.
 import type { TextClip } from '@shared/project/schema'
 import type { Micros } from '@shared/project/time'
+import { transformAt } from '@shared/timeline/keyframes'
 import { LINE_HEIGHT, cssFont, fontPx, splitGraphemes, textAnimationAt } from '@shared/render/textLayout'
 
 type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
@@ -21,7 +22,8 @@ export interface Rect {
  * @returns khung bao khối chữ, hoặc null nếu không có gì để vẽ
  */
 export function drawTextClip(ctx: Ctx2D, clip: TextClip, W: number, H: number, t: Micros): Rect | null {
-  const { style, transform } = clip
+  const { style } = clip
+  const transform = transformAt(clip, t) // có keyframe → vị trí/kích thước/xoay/độ mờ tại thời điểm t
   const anim = textAnimationAt(clip, t)
   const unit = Math.min(W, H) / 1080 // 1 "đơn vị" theo khung 1080p
   const px = fontPx(style, W, H) * transform.scale * anim.scale

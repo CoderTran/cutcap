@@ -10,7 +10,7 @@ import { findClip } from '@shared/timeline/clips'
 import { canHaveTransition } from '@shared/timeline/transitions'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/projectStore'
-import { AudioSection, InfoSection, SpeedSection } from './ClipInfoPanel'
+import { AudioSection, DetachAudioSection, InfoSection, SpeedSection, VocalRemovalSection } from './ClipInfoPanel'
 import { ColorSection } from './ColorSection'
 import { ProjectDetails } from './ProjectDetails'
 import { ProjectSettingsPanel } from './ProjectSettingsPanel'
@@ -93,6 +93,8 @@ export function Inspector(): React.JSX.Element {
             {current === 'audio' && (
               <>
                 <AudioSection clip={clip} disabled={locked} />
+                {asset?.kind === 'video' && <DetachAudioSection clip={clip} disabled={locked} />}
+                {asset && <VocalRemovalSection clip={clip} asset={asset} disabled={locked} />}
                 {asset?.kind === 'audio' && <InfoSection clip={clip} track={track} asset={asset} />}
               </>
             )}

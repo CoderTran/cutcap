@@ -106,12 +106,26 @@ export interface Transition {
   duration: Micros
 }
 
+/** Các thuộc tính đặt keyframe được (xem shared/timeline/keyframes.ts). */
+export const KEYFRAME_PROPS = ['scale', 'x', 'y', 'rotation', 'opacity', 'volume'] as const
+export type KeyframeProp = (typeof KEYFRAME_PROPS)[number]
+
+export interface Keyframe {
+  /** Thời điểm, tính từ ĐẦU CLIP (µs trên timeline). */
+  time: Micros
+  value: number
+}
+
+/** Keyframe theo thuộc tính, mỗi danh sách sắp xếp theo thời gian. Thuộc tính không có = không chuyển động. */
+export type Keyframes = Partial<Record<KeyframeProp, Keyframe[]>>
+
 interface ClipBase {
   id: Id
   /** Vị trí bắt đầu trên timeline. */
   start: Micros
   /** Độ dài hiển thị trên timeline (đã tính tốc độ). */
   duration: Micros
+  keyframes: Keyframes
 }
 
 /** Clip video / ảnh / âm thanh lấy từ một MediaAsset. */
@@ -133,6 +147,11 @@ export interface MediaClip extends ClipBase {
   adjust: ColorAdjust
   transform: Transform
   transitionIn: Transition | null
+  /**
+   * Đã "Xóa giọng hát": id media GỐC trước khi xóa (để nút "Khôi phục" đổi lại). null = chưa xóa giọng.
+   * Trường mới – file dự án cũ không có → null.
+   */
+  vocalsRemovedFrom: Id | null
 }
 
 export const TEXT_ANIMATIONS = ['none', 'fade', 'slide-up', 'zoom', 'typewriter'] as const

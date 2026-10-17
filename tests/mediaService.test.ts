@@ -114,6 +114,37 @@ describe.skipIf(!hasFfmpeg)('MediaService với ffmpeg thật', () => {
     expect(await service.extractAudio(join(dir, 'mất.mp4'), out)).toEqual({ ok: false, error: 'missing' })
   })
 
+  it('xóa giọng (karaoke): âm ở giữa bị triệt tiêu, âm lệch 2 bên còn lại; file mono báo lỗi', async () => {
+    const out = join(dir, 'Âm thanh trích xuất')
+    const q = ['-hide_banner', '-loglevel', 'error', '-y']
+    // "Giọng hát" giả: cùng 1 tiếng ở 2 kênh (nằm giữa). "Nhạc cụ" giả: mỗi kênh 1 tiếng khác nhau.
+    const center = join(dir, 'giữa.wav')
+    const sides = join(dir, 'hai bên.wav')
+    await runProcess(ffmpeg, [...q, '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-ac', '2', center])
+    await runProcess(ffmpeg, [
+      ...q, '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-f', 'lavfi', '-i', 'sine=frequency=660:duration=1',
+      '-filter_complex', '[0:a][1:a]amerge=inputs=2', sides
+    ])
+    const peakDb = async (file: string): Promise<number> => {
+      const { stderr } = await runProcess(ffmpeg, ['-hide_banner', '-i', file, '-af', 'volumedetect', '-f', 'null', '-'])
+      return Number(/max_volume: (-?[\d.]+|-inf) dB/.exec(stderr)?.[1].replace('-inf', '-200'))
+    }
+
+    const a = await service.extractAudio(center, out, 'karaoke')
+    const b = await service.extractAudio(sides, out, 'karaoke')
+    expect(a.ok && b.ok).toBe(true)
+    if (!a.ok || !b.ok) return
+    expect(a.path).toMatch(/giữa \(bỏ giọng [0-9a-f]{6}\)\.m4a$/)
+    expect(await peakDb(a.path)).toBeLessThan(-35) // giọng ở giữa gần như mất hẳn (gốc ≈ −3 dB)
+    expect(await peakDb(b.path)).toBeGreaterThan((await peakDb(sides)) - 6) // nhạc lệch 2 bên vẫn rõ (giảm < 6 dB)
+    // 2 kênh CÙNG PHA: trái − phải nhỏ hơn hẳn tiếng (chỉ còn chút khác biệt ở âm trầm giữ nguyên stereo).
+    // Bộ lọc đầu tiên (ngược pha → nghe rất khó chịu) cho trái − phải còn TO HƠN cả tiếng.
+    const diff = join(dir, 'hiệu.wav')
+    await runProcess(ffmpeg, [...q, '-i', b.path, '-af', 'pan=mono|c0=c0-c1', diff])
+    expect(await peakDb(diff)).toBeLessThan((await peakDb(b.path)) - 20)
+    expect(await service.extractAudio(files.wav, out, 'karaoke')).toEqual({ ok: false, error: 'mono' })
+  })
+
   it('chỉ cho đọc file media hoặc file trong cache', () => {
     expect(service.isAllowedPath(files.mp4)).toBe(true)
     expect(service.isAllowedPath(join(dir, 'cache', 'abc', 'thumb.jpg'))).toBe(true)

@@ -5,6 +5,8 @@ import type { TextFrameSet } from '@shared/ipc'
 import type { Project } from '@shared/project/schema'
 import { MICROS_PER_SECOND } from '@shared/project/time'
 import { animationFrameCount } from '@shared/render/textLayout'
+import { clipEnd } from '@shared/timeline/clips'
+import { hasKeyframes } from '@shared/timeline/keyframes'
 import { drawTextClip } from './drawText'
 
 async function toPng(canvas: OffscreenCanvas): Promise<Uint8Array> {
@@ -29,9 +31,10 @@ export async function renderTextFrames(project: Project, width: number, height: 
         drawTextClip(ctx, clip, width, height, clip.start + (i * MICROS_PER_SECOND) / fps)
         animated.push(await toPng(canvas))
       }
-      // Khung tĩnh: trạng thái sau khi hiệu ứng đã chạy xong
+      // Khung tĩnh cho phần còn lại: sau khi hiệu ứng chạy xong (chữ có keyframe: khung cuối của clip)
       ctx.clearRect(0, 0, width, height)
-      drawTextClip(ctx, clip, width, height, clip.start + clip.animationDuration)
+      const stillAt = hasKeyframes(clip) ? clipEnd(clip) - 1 : clip.start + clip.animationDuration
+      drawTextClip(ctx, clip, width, height, stillAt)
       sets.push({ clipId: clip.id, animated, still: await toPng(canvas) })
     }
   }

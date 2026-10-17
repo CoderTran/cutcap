@@ -6,6 +6,7 @@ import { aspectValue } from '@shared/project/canvas'
 import { ASPECT_RATIOS, type AspectRatio } from '@shared/project/schema'
 import { formatTimecode } from '@shared/project/time'
 import { findClip, projectDuration } from '@shared/timeline/clips'
+import { hasKeyframes, transformAt } from '@shared/timeline/keyframes'
 import { PreviewEngine, type LayerBox } from '../../engine/preview/PreviewEngine'
 import { editorStore, useEditorStore } from '../../state/editorStore'
 import { attachEngine, pause, togglePlay } from '../../state/playbackActions'
@@ -50,7 +51,10 @@ export function PreviewStage(): React.JSX.Element {
   const playing = useEditorStore((s) => s.playing)
   // Góc xoay của lớp đang chọn – khung chọn xoay theo (khung do engine trả về là khung CHƯA xoay, cùng tâm)
   const selectedId = useEditorStore((s) => (s.selectedClipIds.length === 1 ? s.selectedClipIds[0] : null))
-  const selRotation = useProjectStore((s) => (selectedId ? (findClip(s.project, selectedId)?.clip.transform.rotation ?? 0) : 0))
+  const selRotation = useProjectStore((s) => {
+    const clip = selectedId ? findClip(s.project, selectedId)?.clip : undefined
+    return clip ? transformAt(clip, currentTime).rotation : 0 // có keyframe xoay → góc tại đầu phát
+  })
 
   // Tạo engine 1 lần khi khung preview xuất hiện
   useEffect(() => {
@@ -117,7 +121,8 @@ export function PreviewStage(): React.JSX.Element {
     const found = findClip(projectStore.getState().project, clipId)
     if (!found || found.track.locked) return
 
-    const origin = { x: found.clip.transform.x, y: found.clip.transform.y }
+    const now = transformAt(found.clip, editorStore.getState().currentTime)
+    const origin = { x: now.x, y: now.y }
     const start = { x: e.clientX, y: e.clientY }
     const session = newSession('move-layer')
     canvas.setPointerCapture(e.pointerId)
@@ -164,7 +169,10 @@ export function PreviewStage(): React.JSX.Element {
     const center = { x: rect.left + selBox.left + selBox.width / 2, y: rect.top + selBox.top + selBox.height / 2 }
     const startDist = Math.max(4, Math.hypot(e.clientX - center.x, e.clientY - center.y))
     const startAngle = Math.atan2(e.clientY - center.y, e.clientX - center.x)
-    const origin = { fontSize: clip.type === 'text' ? clip.style.fontSize : 0, scale: clip.transform.scale, rotation: clip.transform.rotation }
+    const now = transformAt(clip, editorStore.getState().currentTime)
+    const origin = { fontSize: clip.type === 'text' ? clip.style.fontSize : 0, scale: now.scale, rotation: now.rotation }
+    // Chữ có keyframe "Kích thước" → núm góc đổi Kích thước (theo keyframe) thay vì Cỡ chữ
+    const scaleText = clip.type === 'text' && !hasKeyframes(clip, ['scale'])
     const session = newSession(handle === 'rotate' ? 'rotate-layer' : 'scale-layer')
     const target = e.currentTarget
     target.setPointerCapture(e.pointerId)
@@ -180,7 +188,7 @@ export function PreviewStage(): React.JSX.Element {
         return
       }
       const factor = Math.hypot(ev.clientX - center.x, ev.clientY - center.y) / startDist
-      if (clip.type === 'text') {
+      if (scaleText) {
         const fontSize = Math.round(Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, origin.fontSize * factor)))
         setTextStyle(clip.id, { fontSize }, session)
       } else {

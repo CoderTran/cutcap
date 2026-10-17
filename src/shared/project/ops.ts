@@ -65,7 +65,10 @@ export function addAssets(draft: Project, assets: MediaAsset[]): void {
 
 /** Media có đang được clip nào dùng không. */
 export function isAssetUsed(project: Project, assetId: Id): boolean {
-  return project.tracks.some((t) => t.clips.some((c) => c.type !== 'text' && c.assetId === assetId))
+  // Bản gốc của clip đã "Xóa giọng hát" cũng tính là đang dùng – để nút "Khôi phục" còn file mà đổi lại
+  return project.tracks.some((t) =>
+    t.clips.some((c) => c.type !== 'text' && (c.assetId === assetId || (c.type === 'media' && c.vocalsRemovedFrom === assetId)))
+  )
 }
 
 /**

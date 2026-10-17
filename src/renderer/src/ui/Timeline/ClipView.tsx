@@ -5,10 +5,15 @@
 //  - Kéo mép trái/phải: cắt bớt / kéo dài
 // Logic kéo nằm ở useClipDrag; component này chỉ báo "bắt đầu kéo ở chế độ nào".
 import { memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Clip, Id, MediaAsset, TrackKind } from '@shared/project/schema'
-import { formatTimecode } from '@shared/project/time'
+import { formatTimecode, type Micros } from '@shared/project/time'
 import { effectiveFades } from '@shared/timeline/clipProps'
-import { timeToPx } from '@shared/timeline/ruler'
+import { keyframeTimes } from '@shared/timeline/keyframes'
+import { pxToTime, timeToPx } from '@shared/timeline/ruler'
+import { editorStore } from '../../state/editorStore'
+import { moveKeyframeTime } from '../../state/keyframeActions'
+import { pause } from '../../state/playbackActions'
 import { useMediaPreview } from '../../state/mediaStore'
 import type { DragMode } from './useClipDrag'
 
@@ -23,6 +28,39 @@ interface Props {
   locked: boolean
   fps: number
   onPointerDown: (e: React.PointerEvent, clipId: Id, mode: DragMode) => void
+  /** Chuột phải → mở menu (Tách âm thanh, Sao chép, Xóa…). */
+  onContextMenu: (e: React.MouseEvent, clipId: Id) => void
+}
+
+/** Kéo dưới mức này (pixel) coi như bấm, không phải kéo. */
+const KF_DRAG_THRESHOLD_PX = 3
+
+/** Bấm / kéo dấu ◆: theo dõi chuột trên cả cửa sổ cho tới khi thả. */
+function startKeyframeDrag(e: React.PointerEvent, clip: Clip, time: Micros, pxPerSecond: number, locked: boolean): void {
+  e.stopPropagation() // không để clip bắt đầu kéo
+  if (e.button !== 0) return
+  pause()
+  const startX = e.clientX
+  const session = `kf-drag:${clip.id}:${performance.now()}`
+  let current = time
+  let dragging = false
+
+  const move = (ev: PointerEvent): void => {
+    const dx = ev.clientX - startX
+    if (!dragging && (locked || Math.abs(dx) < KF_DRAG_THRESHOLD_PX)) return
+    dragging = true
+    document.body.classList.add('dragging-keyframe')
+    current = moveKeyframeTime(clip.id, current, time + pxToTime(dx, pxPerSecond), session)
+    editorStore.getState().setCurrentTime(clip.start + current) // đầu phát đi theo để xem ngay hình tại đó
+  }
+  const up = (): void => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', up)
+    document.body.classList.remove('dragging-keyframe')
+    if (!dragging) editorStore.getState().setCurrentTime(clip.start + time)
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
 }
 
 /** Ảnh thu nhỏ lặp lại + sóng âm của file gốc, cắt đúng đoạn clip đang dùng. */
@@ -33,12 +71,14 @@ function MediaStrip({ clip, asset, pxPerSecond }: { clip: Clip; asset: MediaAsse
   // Ảnh sóng âm vẽ cho CẢ file → giãn theo độ dài file (đã tính tốc độ) và dịch tới điểm bắt đầu cắt
   const waveWidth = timeToPx(asset.durationUs / speed, pxPerSecond)
   const waveOffset = -timeToPx(sourceIn / speed, pxPerSecond)
+  // Video đã tách âm thanh (tắt tiếng) → không vẽ sóng âm nữa, giống CapCut
+  const muted = clip.type === 'media' && clip.volume === 0 && asset.kind === 'video'
   return (
     <>
       {asset.kind !== 'audio' && preview?.thumbnailUrl && (
         <div className="tl-clip-thumbs" style={{ backgroundImage: `url("${preview.thumbnailUrl}")` }} />
       )}
-      {preview?.waveformUrl && (
+      {preview?.waveformUrl && !muted && (
         <div
           className="tl-clip-wave"
           style={{
@@ -61,7 +101,8 @@ export const ClipView = memo(function ClipView({
   dragging,
   locked,
   fps,
-  onPointerDown
+  onPointerDown,
+  onContextMenu
 }: Props) {
   const left = timeToPx(clip.start, pxPerSecond)
   const width = Math.max(2, timeToPx(clip.duration, pxPerSecond))
@@ -69,6 +110,8 @@ export const ClipView = memo(function ClipView({
   const media = clip.type === 'media' ? clip : null
   const fades = media && asset?.hasAudio ? effectiveFades(media) : null
   const audioOnly = asset?.kind === 'audio'
+  const { t } = useTranslation()
+  const hint = t('keyframe.dragHint')
 
   return (
     <div
@@ -76,6 +119,7 @@ export const ClipView = memo(function ClipView({
       style={{ left, width }}
       title={`${name}\n${formatTimecode(clip.duration, fps)}`}
       onPointerDown={(e) => onPointerDown(e, clip.id, 'move')}
+      onContextMenu={(e) => onContextMenu(e, clip.id)}
     >
       {/* Dải tên + thời lượng (giống CapCut: "DSCF2285.MOV 00:00:13:01") */}
       <div className="tl-clip-head">
@@ -96,6 +140,20 @@ export const ClipView = memo(function ClipView({
       {/* Hình tam giác fade: phần tối phía trên đường dốc = âm lượng đang nhỏ dần/to dần */}
       {fades && fades.fadeIn > 0 && <div className="tl-fade in" style={{ width: timeToPx(fades.fadeIn, pxPerSecond) }} />}
       {fades && fades.fadeOut > 0 && <div className="tl-fade out" style={{ width: timeToPx(fades.fadeOut, pxPerSecond) }} />}
+
+      {/* Dấu ◆ tại các keyframe (chỉ khi clip đang chọn, giống CapCut):
+          bấm → nhảy đầu phát tới đó; kéo ngang → dời keyframe sang thời điểm khác */}
+      {selected &&
+        keyframeTimes(clip).map((time, i) => (
+          <button
+            // key theo thứ tự (không theo thời gian): đang kéo thì thời gian đổi liên tục, phần tử không được tạo lại
+            key={i}
+            className="tl-kf"
+            style={{ left: timeToPx(time, pxPerSecond) }}
+            title={`${formatTimecode(clip.start + time, fps)} – ${hint}`}
+            onPointerDown={(e) => startKeyframeDrag(e, clip, time, pxPerSecond, locked)}
+          />
+        ))}
 
       {/* Tay nắm 2 mép để cắt – ẩn khi clip quá hẹp hoặc track bị khóa */}
       {!locked && width > 16 && (

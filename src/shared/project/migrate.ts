@@ -7,6 +7,7 @@ import { defaultColorAdjust, defaultSettings, defaultTransform } from './factory
 import {
   ASPECT_RATIOS,
   FRAME_RATES,
+  KEYFRAME_PROPS,
   MEDIA_KINDS,
   PROJECT_FORMAT_VERSION,
   RESOLUTIONS,
@@ -14,6 +15,7 @@ import {
   TRACK_KINDS,
   TRANSITION_KINDS,
   type Clip,
+  type Keyframes,
   type MediaAsset,
   type Project,
   type ProjectSettings,
@@ -113,13 +115,31 @@ function parseTransform(v: unknown): Clip['transform'] {
   }
 }
 
+/** Keyframe: bỏ qua thuộc tính lạ / giá trị hỏng thay vì báo file hỏng; luôn sắp xếp lại theo thời gian. */
+function parseKeyframes(v: unknown): Keyframes {
+  const out: Keyframes = {}
+  if (!isObj(v)) return out
+  for (const prop of KEYFRAME_PROPS) {
+    const list = v[prop]
+    if (!Array.isArray(list)) continue
+    const kfs = list
+      .filter((k): k is Record<string, unknown> => isObj(k) && Number.isFinite(k.time) && Number.isFinite(k.value))
+      .map((k) => ({ time: Math.round(k.time as number), value: k.value as number }))
+      .sort((a, b) => a.time - b.time)
+    if (kfs.length > 0) out[prop] = kfs
+  }
+  return out
+}
+
 function parseClip(v: unknown, where: string): Clip {
   if (!isObj(v)) throw new ProjectFormatError('corrupted', where)
   const base = {
     id: requireId(v.id, where),
     start: micros(v.start),
     duration: Math.max(1, micros(v.duration, 1)),
-    transform: parseTransform(v.transform)
+    transform: parseTransform(v.transform),
+    // Trường mới (Keyframe): file cũ không có → không có keyframe
+    keyframes: parseKeyframes(v.keyframes)
   }
 
   switch (v.type) {
@@ -146,7 +166,9 @@ function parseClip(v: unknown, where: string): Clip {
         },
         transitionIn: tr
           ? { kind: oneOf(tr.kind, TRANSITION_KINDS, 'fade'), duration: micros(tr.duration, 500_000) }
-          : null
+          : null,
+        // Trường mới (Xóa giọng hát): file cũ không có → null
+        vocalsRemovedFrom: typeof v.vocalsRemovedFrom === 'string' && v.vocalsRemovedFrom ? v.vocalsRemovedFrom : null
       }
     }
     case 'text': {

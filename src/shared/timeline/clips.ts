@@ -36,7 +36,8 @@ export function createTextClip(start: Micros, text: string): TextClip {
     transform: defaultTransform(),
     // Giống CapCut: chữ mới không có hiệu ứng, để vừa thêm là thấy ngay trên khung Xem trước
     animationIn: 'none',
-    animationDuration: 500_000
+    animationDuration: 500_000,
+    keyframes: {}
   }
 }
 
@@ -74,7 +75,9 @@ export function createMediaClip(asset: MediaAsset, start: Micros): MediaClip {
     filterIntensity: 1,
     adjust: defaultColorAdjust(),
     transform: defaultTransform(),
-    transitionIn: null
+    transitionIn: null,
+    vocalsRemovedFrom: null,
+    keyframes: {}
   }
 }
 

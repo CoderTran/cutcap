@@ -156,6 +156,72 @@ describe.skipIf(!existsSync(ffmpeg))('xuất video thật bằng ffmpeg', () => 
     expect(full - meanVolumeDb(files.out, 0, 0.05)).toBeGreaterThan(20)
   }, 120_000)
 
+  it('keyframe: kích thước, vị trí, xoay, độ mờ, âm lượng thay đổi theo thời gian đúng như preview', async () => {
+    // Nền đen. Ảnh xanh 200×200 (vừa khung 720 → 720×720 ở 100%):
+    //   [0–2s]: Kích thước 25% → 50%, X 0.5 → 0.75 (dời sang phải)
+    //   [2–3s]: Kích thước 25%, Xoay 0° → 90°, Độ mờ 100% → 0%
+    // Nhạc nền [0–3s]: Âm lượng 0% → 100%
+    const p = createEmptyProject('Keyframe')
+    p.settings.resolution = '720p'
+    p.assets.blue = structuredClone(project.assets.blue)
+    p.assets.wav = structuredClone(project.assets.wav)
+    const main = p.tracks[0].id
+    const music = ops.addTrack(p, 'audio')
+    ops.addClip(p, main, {
+      ...createMediaClip(p.assets.blue, 0),
+      duration: 2 * S,
+      keyframes: {
+        scale: [{ time: 0, value: 0.25 }, { time: 2 * S, value: 0.5 }],
+        x: [{ time: 0, value: 0.5 }, { time: 2 * S, value: 0.75 }]
+      }
+    })
+    ops.addClip(p, main, {
+      ...createMediaClip(p.assets.blue, 2 * S),
+      duration: 1 * S,
+      transform: { x: 0.5, y: 0.5, scale: 0.25, rotation: 0, opacity: 1 },
+      keyframes: {
+        rotation: [{ time: 0, value: 0 }, { time: 1 * S, value: 90 }],
+        opacity: [{ time: 0, value: 1 }, { time: 1 * S, value: 0 }]
+      }
+    })
+    ops.addClip(p, music, {
+      ...createMediaClip(p.assets.wav, 0),
+      duration: 3 * S,
+      keyframes: { volume: [{ time: 0, value: 0 }, { time: 3 * S, value: 1 }] }
+    })
+
+    const out = join(dir, 'Keyframe.mp4')
+    const exporter = new Exporter({ ffmpegExe: ffmpeg, tempDir: join(dir, 'tmp'), onProgress: () => {} })
+    const result = await exporter.run({
+      project: p,
+      settings: { outputPath: out, resolution: '720p', fps: 30, quality: 'standard', encoder: 'libx264' },
+      textFrames: []
+    })
+    expect(result.status).toBe('done')
+
+    const blue = [0, 0, 255]
+    const black = [0, 0, 0]
+    // t=0: 25% → 180×180 ở giữa (640, 360): mép phải ở x = 730
+    expect(near(pixelAt(out, 0, 720, 360), blue)).toBe(true)
+    expect(near(pixelAt(out, 0, 745, 360), black)).toBe(true)
+    // t=1: 37.5% → 270×270, tâm dời tới x = 0.625 × 1280 = 800 → mép ở 665…935
+    expect(near(pixelAt(out, 1, 800, 360), blue)).toBe(true)
+    expect(near(pixelAt(out, 1, 925, 360), blue)).toBe(true)
+    expect(near(pixelAt(out, 1, 950, 360), black)).toBe(true)
+    expect(near(pixelAt(out, 1, 650, 360), black)).toBe(true)
+    // t=2.5: xoay 45° (hình thoi), độ mờ 50% → xanh nhạt trên nền đen.
+    // Điểm (+70, +70) nằm TRONG hình vuông chưa xoay (nửa cạnh 90) nhưng NGOÀI hình thoi (|dx|+|dy| = 140 > 127)
+    expect(near(pixelAt(out, 2.5, 640, 360), [0, 0, 128], 30)).toBe(true)
+    expect(near(pixelAt(out, 2.5, 710, 430), black)).toBe(true)
+    expect(near(pixelAt(out, 2.5, 640 + 115, 360), [0, 0, 128], 30)).toBe(true) // đỉnh hình thoi: xa hơn nửa cạnh
+
+    // Âm lượng 0 → 1: giây 0.5 (≈17%) nhỏ hơn giây 2.5 (≈83%) khoảng 14 dB
+    const early = meanVolumeDb(out, 0.4, 0.2)
+    const late = meanVolumeDb(out, 2.4, 0.2)
+    expect(late - early).toBeGreaterThan(10)
+    expect(late - early).toBeLessThan(18)
+  }, 120_000)
+
   it('hủy giữa chừng: không để lại file dở dang', async () => {
     // Video dài 40s để kịp hủy
     const long = structuredClone(project)

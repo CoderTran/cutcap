@@ -106,6 +106,44 @@ export function extractAudioArgs(src: string, dest: string, audioCodec: string |
 }
 
 /**
+ * Phiên bản bộ lọc xóa giọng – tăng lên mỗi khi đổi karaokeArgs để file đã tạo bằng bộ lọc cũ
+ * không bị dùng lại (tên file chứa mã băm có tính cả số này).
+ */
+export const KARAOKE_VERSION = 2
+
+/** Dưới tần số này coi là âm trầm (bass, trống kick) – giữ nguyên khi xóa giọng để nhạc không bị mỏng. */
+const KARAOKE_BASS_HZ = 150
+
+/**
+ * Lệnh "Xóa giọng hát" (karaoke) kiểu đơn giản, không dùng AI.
+ * Giọng hát thường nằm GIỮA (giống nhau ở 2 kênh) → phần "hai bên" S = (trái − phải)/√2 không còn giọng.
+ *  - Đưa S vào CẢ HAI kênh cùng pha. (Bản đầu dùng trái−phải / phải−trái: 2 kênh ngược pha nhau,
+ *    nghe tai nghe rất khó chịu, "xoáy" trong đầu.)
+ *  - Hệ số 1/√2 giữ nhạc cụ ở 2 bên to gần bằng bản gốc.
+ *  - Cộng lại phần âm trầm của bản gốc; giới hạn đỉnh ở cuối để không bị vỡ tiếng khi cộng.
+ * Đo trên bài thử (giọng có tiếng vang lệch 2 kênh như bản thu thật): giọng giảm ~13 dB, nhạc cụ giữ nguyên.
+ * Hạn chế: chỉ có tác dụng với nhạc stereo; nhạc cụ đặt ở giữa cũng bị giảm; kết quả gần như mono.
+ */
+export function karaokeArgs(src: string, dest: string): string[] {
+  const graph = [
+    '[0:a:0]aformat=channel_layouts=stereo,asplit=2[full][mid]',
+    `[full]lowpass=f=${KARAOKE_BASS_HZ},lowpass=f=${KARAOKE_BASS_HZ}[bass]`,
+    `[mid]pan=stereo|c0=0.707*c0-0.707*c1|c1=0.707*c0-0.707*c1,highpass=f=${KARAOKE_BASS_HZ}[side]`,
+    '[bass][side]amix=inputs=2:normalize=0,alimiter=limit=0.95:level=disabled[out]'
+  ].join(';')
+  return [
+    '-hide_banner', '-loglevel', 'error', '-y',
+    '-i', src,
+    '-filter_complex', graph,
+    '-map', '[out]',
+    '-c:a', 'aac', '-b:a', '192k',
+    '-movflags', '+faststart',
+    '-f', 'mp4',
+    dest
+  ]
+}
+
+/**
  * Lệnh tạo proxy. Ghi tiến trình ra stdout ("-progress pipe:1") để hiện thanh phần trăm.
  * @param dest đường dẫn file tạm; caller đổi tên sau khi xong (để không bao giờ dùng nhầm file dở dang)
  */

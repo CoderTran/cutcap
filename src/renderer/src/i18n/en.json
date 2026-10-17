@@ -96,7 +96,13 @@
     "trimLeft": "Delete left part",
     "trimRight": "Delete right part",
     "removeEmptyText": "Remove empty text",
-    "extractAudio": "Extract audio"
+    "extractAudio": "Extract audio",
+    "detachAudio": "Detach audio",
+    "removeVocals": "Remove vocals",
+    "restoreVocals": "Restore vocals",
+    "keyframe": "Keyframe",
+    "clearKeyframes": "Clear keyframes",
+    "moveKeyframe": "Move keyframe"
   },
   "status": {
     "loading": "Loading…",
@@ -132,7 +138,8 @@
       "missing": "file not found",
       "ffmpeg-missing": "FFmpeg missing (run: npm run setup:ffmpeg)",
       "no-audio": "video has no sound",
-      "failed": "could not extract the audio"
+      "failed": "could not extract the audio",
+      "mono": "mono file, cannot remove vocals"
     },
     "relink": "Locate",
     "missingNotice": "{{count}} source files not found – click \"Locate\" on a card to pick the new location.",
@@ -269,8 +276,9 @@
     "scale": "Scale",
     "rotation": "Rotation",
     "opacity": "Opacity",
-    "dragHint": "Drag in the Preview to move it.",
-    "center": "Center"
+    "dragHint": "Drag on the Preview to move. Click ◇ to set a keyframe – between 2 keyframes the value changes gradually.",
+    "center": "Center",
+    "position": "Position"
   },
   "transition": {
     "title": "Transition",
@@ -396,5 +404,41 @@
     "noVideos": "No videos with sound in this project yet.",
     "fromComputer": "Choose a video on this PC…",
     "suffix": "(audio)"
+  },
+  "clipMenu": {
+    "detachAudio": "Detach audio",
+    "split": "Split at playhead",
+    "copy": "Copy",
+    "cut": "Cut",
+    "paste": "Paste",
+    "delete": "Delete",
+    "detachHint": "Move the sound of this video to its own audio track to edit it separately; the video gets muted.",
+    "detachedHint": "This video is muted (or its audio was already detached) – raise the volume to detach again."
+  },
+  "vocals": {
+    "title": "Remove vocals",
+    "button": "Remove vocals",
+    "suffix": "(no vocals)",
+    "hint": "Karaoke: cancels sound panned to the center (usually the vocals) and keeps the backing track and bass. Simple, non-AI method – works only on stereo music, some vocals (especially reverb) may remain, and the result is almost mono. Videos get their audio detached to a separate track.",
+    "done": "This clip uses the vocal-free version. Click \"Restore\" to get the original back.",
+    "muted": "This video is muted (audio detached) – select the audio clip below to remove vocals.",
+    "errors": {
+      "mono": "The file has only one channel (mono), so vocals cannot be removed – this needs stereo music.",
+      "no-audio": "The clip has no sound.",
+      "missing": "Source file not found.",
+      "ffmpeg-missing": "FFmpeg is missing.",
+      "failed": "Could not process the audio file."
+    },
+    "restore": "Restore",
+    "restoreHint": "Put the original sound (with vocals) back on this clip",
+    "doneNoOriginal": "This clip uses a vocal-free version made by an older version (the original is not recorded, so it cannot be restored)."
+  },
+  "keyframe": {
+    "add": "Add a keyframe at the playhead",
+    "remove": "Remove this keyframe",
+    "prev": "Previous keyframe",
+    "next": "Next keyframe",
+    "outside": "Move the playhead inside the clip to set a keyframe",
+    "dragHint": "drag to change its time, click to go there"
   }
 }

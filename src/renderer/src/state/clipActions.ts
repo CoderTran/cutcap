@@ -4,6 +4,8 @@ import type { Id, TransitionKind } from '@shared/project/schema'
 import type { Micros } from '@shared/project/time'
 import { applyColor, applyColorToAll, applyFades, applySpeed, applyVolume, type ColorChanges } from '@shared/timeline/clipProps'
 import { applyTransition } from '@shared/timeline/transitions'
+import { findClip } from '@shared/timeline/clips'
+import { editTimeFor } from './keyframeActions'
 import { projectStore } from './projectStore'
 import { minClipDuration } from './timelineActions'
 
@@ -18,7 +20,14 @@ export function setClipSpeed(clipId: Id, speed: number, session?: string): void 
 }
 
 export function setClipVolume(clipId: Id, volume: number, session?: string): void {
-  projectStore.getState().apply('history.clipVolume', (d) => applyVolume(d, clipId, volume), coalesce(session))
+  projectStore.getState().apply(
+    'history.clipVolume',
+    (d) => {
+      const clip = findClip(d, clipId)?.clip
+      if (clip) applyVolume(d, clipId, volume, editTimeFor(clip)) // đã có keyframe → keyframe tại đầu phát
+    },
+    coalesce(session)
+  )
 }
 
 export function setClipFades(clipId: Id, fadeIn: Micros, fadeOut: Micros, session?: string): void {

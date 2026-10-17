@@ -2,6 +2,7 @@
 import { dirname, join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { IpcChannels, type MediaPreview } from '@shared/ipc'
+import type { AudioDerive } from '@shared/media/derived'
 import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, extensionOf, fileNameOf } from '@shared/media/formats'
 import { handleMediaProtocol } from '../media/mediaProtocol'
 import { MediaService } from '../media/mediaService'
@@ -69,8 +70,8 @@ export function registerMediaHandlers(): MediaService {
 
   ipcMain.handle(IpcChannels.importMedia, (_event, paths: string[]) => media.importFiles(paths))
   // File âm thanh trích xuất là dữ liệu của người dùng → để cạnh các dự án, không để trong cache
-  ipcMain.handle(IpcChannels.extractAudio, (_event, videoPath: string) =>
-    media.extractAudio(videoPath, join(defaultProjectsDir(), strings.extractedAudioFolder))
+  ipcMain.handle(IpcChannels.extractAudio, (_event, path: string, mode?: AudioDerive) =>
+    media.extractAudio(path, join(defaultProjectsDir(), strings.extractedAudioFolder), mode === 'karaoke' ? 'karaoke' : 'extract')
   )
 
   // Tìm lại file bị mất: hộp thoại mở sẵn ở thư mục cũ (nếu còn), lọc đúng đuôi file cũ

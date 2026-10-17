@@ -11,6 +11,7 @@ import type { Clip, Id, Project, Track, TrackKind } from '../project/schema'
 import type { Micros } from '../project/time'
 import { canPlace, clipEnd, findClip } from './clips'
 import { clampFades } from './clipProps'
+import { shiftKeyframes } from './keyframes'
 
 // ───────────────────────── Tiện ích ─────────────────────────
 
@@ -150,6 +151,7 @@ export function applyTrim(draft: Project, clipId: Id, edge: TrimEdge, time: Micr
     if (clip.type === 'media') clip.sourceIn = Math.max(0, Math.round(clip.sourceIn + shift * clip.speed))
     clip.start = t
     clip.duration -= shift
+    shiftKeyframes(clip, -shift) // keyframe tính từ đầu clip → dời theo để vẫn bám đúng nội dung
   } else {
     clip.duration = t - clip.start
   }
@@ -182,6 +184,8 @@ export function splitClip(draft: Project, clipId: Id, at: Micros, minDuration: M
     left.fadeOut = 0 // hiệu ứng mờ dần ra chuyển sang nửa sau
   }
   if (right.type === 'text') right.animationIn = 'none'
+  // Cả 2 nửa giữ mọi keyframe (nửa sau dời theo điểm cắt) → chuyển động liền mạch qua chỗ tách
+  shiftKeyframes(right, -cut)
 
   left.duration = cut
   clampFades(left)

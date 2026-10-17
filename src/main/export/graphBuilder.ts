@@ -16,6 +16,7 @@ import { clipFfmpegFilters } from '@shared/render/filters'
 import { placeLayer } from '@shared/render/geometry'
 import { clipEnd, projectDuration } from '@shared/timeline/clips'
 import { effectiveFades } from '@shared/timeline/clipProps'
+import { ffmpegValueExpr, hasKeyframes, keyframesOf } from '@shared/timeline/keyframes'
 import { transitionAt, type ActiveTransition } from '@shared/timeline/transitions'
 
 export interface ExportGraph {
@@ -96,6 +97,85 @@ interface InputInfo {
   sourceOffset: number
   /** Phần thiếu ở đầu (µs timeline) phải "giữ khung đầu" vì file gốc không đủ. */
   padStart: number
+}
+
+/** Cạnh lớn nhất của ảnh trung gian khi phóng to bằng keyframe (giới hạn để không quá nặng). */
+const MAX_ANIMATED_SIDE = 4096
+/** Viền trong suốt quanh ảnh trung gian (pixel). */
+const ANIMATED_MARGIN = 4
+
+/**
+ * Lớp hình có keyframe (kích thước / vị trí / xoay / độ mờ thay đổi theo thời gian).
+ *
+ * FFmpeg không đổi được kích thước khung hình giữa chừng một cách ổn định, nên:
+ *   1. co ảnh về kích thước LỚN NHẤT mà keyframe cần (sắc nét khi phóng to)
+ *   2. đặt vào một khung trong suốt đủ lớn
+ *   3. bộ lọc perspective (tính lại MỖI KHUNG HÌNH) đưa 4 góc ảnh tới đúng chỗ: phóng to + xoay + dời
+ *      – cùng công thức placeLayer của preview, giá trị lấy từ keyframe (ffmpegValueExpr)
+ *   4. cắt về đúng khung hình; độ mờ thay đổi thì nhân kênh alpha bằng geq
+ * Kết quả: một lớp W×H đặt ở góc (0, 0).
+ *
+ * @param extBefore phần lớp hình bắt đầu sớm hơn clip (chuyển cảnh) – thời gian keyframe tính từ đầu clip
+ * @returns size: co ảnh (đặt trước bộ lọc màu); place: đặt ảnh vào khung (đặt sau)
+ */
+export function animatedLayerFilters(
+  clip: Clip,
+  srcW: number,
+  srcH: number,
+  W: number,
+  H: number,
+  fps: number,
+  extBefore: Micros
+): { size: string[]; place: string[] } {
+  const fit = Math.min(W / srcW, H / srcH)
+  const scales = keyframesOf(clip, 'scale').map((k) => k.value)
+  const sMax = Math.max(...(scales.length > 0 ? scales : [clip.transform.scale]), 0.05)
+  let bw = srcW * fit * sMax
+  let bh = srcH * fit * sMax
+  const shrink = Math.min(1, MAX_ANIMATED_SIDE / Math.max(bw, bh))
+  bw = Math.max(2, Math.round(bw * shrink))
+  bh = Math.max(2, Math.round(bh * shrink))
+  /** 1 điểm ảnh trung gian = unit × Kích thước điểm ảnh trên khung hình. */
+  const unit = (srcW * fit) / bw
+  // perspective lấy màu MÉP ẢNH cho phần nằm ngoài ảnh gốc → chừa viền trong suốt cả 4 phía,
+  // nếu không mép ảnh sẽ bị kéo loang ra khắp khung
+  const m = ANIMATED_MARGIN
+  const CW = Math.max(W, bw + 2 * m)
+  const CH = Math.max(H, bh + 2 * m)
+
+  // perspective: "on" = số thứ tự khung hình (đã chuẩn hóa fps) → giây tính từ đầu clip
+  const tp = `(on/${fps}-${sec(extBefore)})`
+  const S = ffmpegValueExpr(clip, 'scale', tp)
+  const X = ffmpegValueExpr(clip, 'x', tp)
+  const Y = ffmpegValueExpr(clip, 'y', tp)
+  const A = `(${ffmpegValueExpr(clip, 'rotation', tp)})*PI/180`
+  const corner = (px: number, py: number): [string, string] => {
+    const dx = px - (m + bw / 2)
+    const dy = py - (m + bh / 2)
+    const k = `${unit.toFixed(8)}*(${S})`
+    return [
+      `${W}*(${X})+${k}*((${dx})*cos(${A})-(${dy})*sin(${A}))`,
+      `${H}*(${Y})+${k}*((${dx})*sin(${A})+(${dy})*cos(${A}))`
+    ]
+  }
+  const pts = [corner(0, 0), corner(CW, 0), corner(0, CH), corner(CW, CH)]
+  const coords = pts.map(([x, y], i) => `x${i}='${x}':y${i}='${y}'`).join(':')
+
+  const opacityKf = keyframesOf(clip, 'opacity').length > 0
+  const opacity = opacityKf
+    ? // geq: "T" = giây của khung hình tính từ đầu lớp
+      [`geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*clip(${ffmpegValueExpr(clip, 'opacity', `(T-${sec(extBefore)})`)},0,1)'`]
+    : clip.transform.opacity < 1
+      ? [`colorchannelmixer=aa=${clip.transform.opacity.toFixed(4)}`]
+      : []
+  return {
+    size: [
+      `fps=${fps}`, // khung hình đều → "on" của perspective khớp với thời gian
+      `scale=${bw}:${bh}:flags=bicubic`,
+      'format=rgba'
+    ],
+    place: [...opacity, `pad=${CW}:${CH}:${m}:${m}:color=0x00000000`, `perspective=${coords}:sense=destination:eval=frame`, `crop=${W}:${H}:0:0`]
+  }
 }
 
 /**
@@ -199,13 +279,46 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
       const input = addInput({ clip, track, asset }, extBefore, extAfter)
       const srcW = asset.width ?? W
       const srcH = asset.height ?? H
+      const speed = clip.type === 'media' ? clip.speed : 1
+      const timing = [
+        // Đưa mốc thời gian về 0, áp dụng tốc độ (nhanh gấp đôi = thời gian chia 2)
+        speed === 1 ? 'setpts=PTS-STARTPTS' : `setpts=(PTS-STARTPTS)/${speed}`,
+        // File gốc không đủ phần trước/sau cho chuyển cảnh → giữ khung đầu / khung cuối
+        ...(input.padStart > 0 ? [`tpad=start_mode=clone:start_duration=${sec(input.padStart)}`] : []),
+        ...(extAfter > 0 ? [`tpad=stop_mode=clone:stop_duration=${sec(extAfter)}`] : [])
+      ]
+      // Mờ dần / phóng to khi chuyển cảnh: độ mờ tăng 0 → 1 (thời gian cục bộ của lớp, bắt đầu từ 0)
+      const fadeIn = tin && (tin.kind === 'fade' || tin.kind === 'zoom') ? [`fade=t=in:st=0:d=${sec(tin.duration)}:alpha=1`] : []
+
+      if (hasKeyframes(clip)) {
+        // Có keyframe: kích thước/vị trí/xoay/độ mờ tính lại mỗi khung hình (xem animatedLayerFilters)
+        const anim = animatedLayerFilters(clip, srcW, srcH, W, H, fps, extBefore)
+        const chain = [
+          ...timing,
+          ...anim.size,
+          ...(clip.type === 'media' ? clipFfmpegFilters(clip) : []),
+          ...fadeIn,
+          ...anim.place,
+          `setpts=PTS+${sec(layerFrom)}/TB`
+        ]
+        const layer = `v${layerIndex}`
+        const out = `o${layerIndex}`
+        filters.push(`[${input.index}:v]${chain.join(',')}[${layer}]`)
+        filters.push(
+          `[${current}][${layer}]overlay=x='${slideX(0, W, tin, tout)}':y=0:eof_action=pass:repeatlast=0:` +
+            `enable='between(t,${sec(layerFrom)},${sec(layerTo - 1)})'[${out}]`
+        )
+        current = out
+        layerIndex++
+        continue
+      }
+
       const p = placeLayer(srcW, srcH, W, H, clip.transform)
       const w = Math.max(2, Math.round(p.width))
       const h = Math.max(2, Math.round(p.height))
       const box = p.rotation !== 0 ? rotatedBox(w, h, p.rotation) : { w, h }
       let x = Math.round(p.cx - box.w / 2)
       let y = Math.round(p.cy - box.h / 2)
-      const speed = clip.type === 'media' ? clip.speed : 1
 
       // "Phóng to": phóng cả khung quanh tâm khung (zoompan) → cần đặt lớp lên khung trong suốt đủ cỡ
       // trước. Chỉ làm được khi lớp nằm gọn trong khung (trường hợp thường gặp); nếu không thì chỉ mờ dần.
@@ -213,18 +326,13 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
       const zoomIn = tin?.kind === 'zoom' && fitsFrame
 
       const chain = [
-        // Đưa mốc thời gian về 0, áp dụng tốc độ (nhanh gấp đôi = thời gian chia 2)
-        speed === 1 ? 'setpts=PTS-STARTPTS' : `setpts=(PTS-STARTPTS)/${speed}`,
-        // File gốc không đủ phần trước/sau cho chuyển cảnh → giữ khung đầu / khung cuối
-        ...(input.padStart > 0 ? [`tpad=start_mode=clone:start_duration=${sec(input.padStart)}`] : []),
-        ...(extAfter > 0 ? [`tpad=stop_mode=clone:stop_duration=${sec(extAfter)}`] : []),
+        ...timing,
         `scale=${w}:${h}:flags=bicubic`,
         'format=rgba',
         ...(clip.type === 'media' ? clipFfmpegFilters(clip) : []),
         ...(p.rotation !== 0 ? [`rotate=${p.rotation.toFixed(6)}:ow=rotw(${p.rotation.toFixed(6)}):oh=roth(${p.rotation.toFixed(6)}):c=none`] : []),
         ...(p.opacity < 1 ? [`colorchannelmixer=aa=${p.opacity.toFixed(4)}`] : []),
-        // Mờ dần / phóng to: độ mờ tăng tuyến tính 0 → 1 trong lúc chuyển cảnh (thời gian cục bộ của lớp, bắt đầu từ 0)
-        ...(tin && (tin.kind === 'fade' || tin.kind === 'zoom') ? [`fade=t=in:st=0:d=${sec(tin.duration)}:alpha=1`] : []),
+        ...fadeIn,
         ...(zoomIn
           ? [
               `pad=${W}:${H}:${x}:${y}:color=0x00000000`,
@@ -254,7 +362,10 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
   for (const track of project.tracks) {
     if (track.muted) continue
     for (const clip of track.clips) {
-      if (clip.type !== 'media' || clip.volume <= 0) continue
+      if (clip.type !== 'media') continue
+      const volumeKf = keyframesOf(clip, 'volume')
+      // Im lặng suốt clip → bỏ qua (có keyframe âm lượng > 0 thì vẫn phải xử lý)
+      if (volumeKf.length > 0 ? volumeKf.every((k) => k.value <= 0) : clip.volume <= 0) continue
       const asset = project.assets[clip.assetId]
       if (!asset || asset.kind === 'image' || !asset.hasAudio) continue
 
@@ -267,7 +378,12 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
         'asetpts=PTS-STARTPTS',
         'aformat=sample_rates=48000:channel_layouts=stereo',
         ...atempoChain(clip.speed),
-        ...(clip.volume !== 1 ? [`volume=${clip.volume}`] : []),
+        // Âm lượng: có keyframe → tính lại mỗi khung âm thanh ("t" = giây tính từ đầu clip, giống volumeAt)
+        ...(volumeKf.length > 0
+          ? [`volume='${ffmpegValueExpr(clip, 'volume', 't')}':eval=frame`]
+          : clip.volume !== 1
+            ? [`volume=${clip.volume}`]
+            : []),
         // Fade tuyến tính (curve=tri), tính theo thời gian của clip sau khi đổi tốc độ – giống clipGainAt
         ...(fadeIn > 0 ? [`afade=t=in:st=0:d=${sec(fadeIn)}:curve=tri`] : []),
         ...(fadeOut > 0 ? [`afade=t=out:st=${sec(clip.duration - fadeOut)}:d=${sec(fadeOut)}:curve=tri`] : []),

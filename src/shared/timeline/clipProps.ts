@@ -3,6 +3,7 @@
 import type { Clip, ColorAdjust, Id, MediaClip, Project, TextAnimation, TextStyle, Transform } from '../project/schema'
 import type { Micros } from '../project/time'
 import { clipEnd, findClip } from './clips'
+import { clampProp, scaleKeyframeTimes, setAnimatedValue, volumeAt } from './keyframes'
 
 export const MIN_SPEED = 0.25
 export const MAX_SPEED = 4
@@ -42,6 +43,8 @@ export function applySpeed(draft: Project, clipId: Id, speed: number, minDuratio
   const plan = planSpeed(draft, clipId, speed, minDuration)
   const clip = findClip(draft, clipId)?.clip
   if (!plan || !clip || clip.type !== 'media') return
+  // Keyframe bám theo nội dung: nhanh gấp đôi → khoảng cách giữa các keyframe ngắn đi một nửa
+  scaleKeyframeTimes(clip, clip.speed / plan.speed)
   clip.speed = plan.speed
   clip.duration = plan.duration
   clampFades(clip)
@@ -49,9 +52,13 @@ export function applySpeed(draft: Project, clipId: Id, speed: number, minDuratio
 
 // ───────────────────────── Âm lượng & fade ─────────────────────────
 
-export function applyVolume(draft: Project, clipId: Id, volume: number): void {
+/** @param at thời điểm đang chỉnh – âm lượng đã có keyframe thì tạo/sửa keyframe tại đó */
+export function applyVolume(draft: Project, clipId: Id, volume: number, at?: Micros): void {
   const clip = findClip(draft, clipId)?.clip
-  if (clip?.type === 'media') clip.volume = clamp(Math.round(volume * 100) / 100, 0, MAX_VOLUME)
+  if (clip?.type !== 'media') return
+  const v = clamp(Math.round(volume * 100) / 100, 0, MAX_VOLUME)
+  if (at !== undefined) setAnimatedValue(clip, 'volume', v, at)
+  else clip.volume = v
 }
 
 export function applyFades(draft: Project, clipId: Id, fadeIn: Micros, fadeOut: Micros): void {
@@ -87,7 +94,7 @@ export function clipGainAt(clip: MediaClip, t: Micros): number {
   const remaining = clipEnd(clip) - t
   const fin = fadeIn > 0 ? clamp(local / fadeIn, 0, 1) : 1
   const fout = fadeOut > 0 ? clamp(remaining / fadeOut, 0, 1) : 1
-  return clip.volume * fin * fout
+  return volumeAt(clip, t) * fin * fout
 }
 
 // ───────────────────────── Chữ & vị trí ─────────────────────────
@@ -112,16 +119,21 @@ export function applyTextAnimation(draft: Project, clipId: Id, animation: TextAn
   clip.animationDuration = Math.round(clamp(duration, 100_000, 5_000_000))
 }
 
-/** Đổi vị trí / kích thước / xoay / độ mờ của lớp hình (video, ảnh, chữ). */
-export function applyTransform(draft: Project, clipId: Id, changes: Partial<Transform>): void {
+/**
+ * Đổi vị trí / kích thước / xoay / độ mờ của lớp hình (video, ảnh, chữ).
+ * @param at thời điểm đang chỉnh (đầu phát). Thuộc tính đã có keyframe → tạo/sửa keyframe tại đó;
+ *           không truyền → luôn đổi giá trị thường (vd. nút "Về giữa" khi chưa có keyframe).
+ */
+export function applyTransform(draft: Project, clipId: Id, changes: Partial<Transform>, at?: Micros): void {
   const clip = findClip(draft, clipId)?.clip
   if (!clip) return
-  Object.assign(clip.transform, changes)
-  const t = clip.transform
-  t.x = clamp(t.x, -0.5, 1.5) // cho phép kéo ra ngoài khung một nửa
-  t.y = clamp(t.y, -0.5, 1.5)
-  t.scale = clamp(t.scale, 0.05, 10)
-  t.opacity = clamp(t.opacity, 0, 1)
+  for (const prop of Object.keys(changes) as (keyof Transform)[]) {
+    const value = changes[prop]
+    if (value === undefined) continue
+    // x, y cho phép kéo ra ngoài khung một nửa; giới hạn chung nằm ở clampProp
+    if (at !== undefined) setAnimatedValue(clip, prop, value, at)
+    else clip.transform[prop] = clampProp(prop, value)
+  }
 }
 
 // ───────────────────────── Màu sắc ─────────────────────────

@@ -96,7 +96,13 @@
     "trimLeft": "Xóa phần bên trái",
     "trimRight": "Xóa phần bên phải",
     "removeEmptyText": "Xóa chữ trống",
-    "extractAudio": "Trích xuất âm thanh"
+    "extractAudio": "Trích xuất âm thanh",
+    "detachAudio": "Tách âm thanh",
+    "removeVocals": "Xóa giọng hát",
+    "restoreVocals": "Khôi phục giọng hát",
+    "keyframe": "Keyframe",
+    "clearKeyframes": "Xóa keyframe",
+    "moveKeyframe": "Dời keyframe"
   },
   "status": {
     "loading": "Đang tải…",
@@ -132,7 +138,8 @@
       "missing": "không tìm thấy file",
       "ffmpeg-missing": "chưa có FFmpeg (chạy: npm run setup:ffmpeg)",
       "no-audio": "video không có tiếng",
-      "failed": "không trích xuất được âm thanh"
+      "failed": "không trích xuất được âm thanh",
+      "mono": "file mono, không xóa giọng được"
     },
     "relink": "Tìm lại",
     "missingNotice": "Không tìm thấy {{count}} file gốc – bấm \"Tìm lại\" trên thẻ để chọn vị trí mới.",
@@ -269,8 +276,9 @@
     "scale": "Kích thước",
     "rotation": "Xoay",
     "opacity": "Độ mờ",
-    "dragHint": "Kéo trên khung Xem trước để đổi vị trí.",
-    "center": "Về giữa"
+    "dragHint": "Kéo trên khung Xem trước để đổi vị trí. Bấm ◇ để đặt keyframe – giữa 2 keyframe, giá trị đổi dần theo thời gian.",
+    "center": "Về giữa",
+    "position": "Vị trí"
   },
   "transition": {
     "title": "Chuyển cảnh",
@@ -396,5 +404,41 @@
     "noVideos": "Chưa có video nào có tiếng trong dự án.",
     "fromComputer": "Chọn video trên máy…",
     "suffix": "(âm thanh)"
+  },
+  "clipMenu": {
+    "detachAudio": "Tách âm thanh",
+    "split": "Tách tại đầu phát",
+    "copy": "Sao chép",
+    "cut": "Cắt",
+    "paste": "Dán",
+    "delete": "Xóa",
+    "detachHint": "Đưa tiếng của video xuống một track âm thanh riêng để chỉnh/cắt độc lập; video sẽ được tắt tiếng.",
+    "detachedHint": "Video này đã tắt tiếng (hoặc đã tách âm thanh) – tăng âm lượng lên nếu muốn tách lại."
+  },
+  "vocals": {
+    "title": "Xóa giọng hát",
+    "button": "Xóa giọng hát",
+    "suffix": "(bỏ giọng)",
+    "hint": "Làm nhạc karaoke: triệt tiêu phần âm nằm giữa (thường là giọng hát), giữ lại nhạc nền và âm trầm. Bản đơn giản, không dùng AI – chỉ hiệu quả với nhạc stereo, có thể còn sót giọng (nhất là tiếng vang), kết quả gần như mono. Video sẽ được tách âm thanh ra track riêng.",
+    "done": "Clip này đang dùng bản đã xóa giọng hát. Bấm \"Khôi phục\" để lấy lại bản gốc.",
+    "muted": "Video đang tắt tiếng (đã tách âm thanh) – chọn clip âm thanh bên dưới để xóa giọng.",
+    "errors": {
+      "mono": "File chỉ có 1 kênh (mono) nên không xóa giọng được – cách này cần nhạc stereo.",
+      "no-audio": "Clip không có tiếng.",
+      "missing": "Không tìm thấy file gốc.",
+      "ffmpeg-missing": "Chưa có FFmpeg.",
+      "failed": "Không xử lý được file âm thanh."
+    },
+    "restore": "Khôi phục",
+    "restoreHint": "Trả clip về tiếng gốc (có giọng hát)",
+    "doneNoOriginal": "Clip này dùng bản đã xóa giọng hát (tạo từ phiên bản cũ, không còn lưu bản gốc để khôi phục)."
+  },
+  "keyframe": {
+    "add": "Thêm keyframe tại đầu phát",
+    "remove": "Xóa keyframe này",
+    "prev": "Tới keyframe trước",
+    "next": "Tới keyframe sau",
+    "outside": "Đưa đầu phát vào trong clip để đặt keyframe",
+    "dragHint": "kéo để đổi thời điểm, bấm để tới đó"
   }
 }

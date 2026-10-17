@@ -36,7 +36,9 @@ function sampleProject(): Project {
     filterIntensity: 1,
     adjust: { brightness: 0, contrast: 0, saturation: 0 },
     transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
-    transitionIn: null
+    transitionIn: null,
+    vocalsRemovedFrom: null,
+    keyframes: {}
   })
   return p
 }

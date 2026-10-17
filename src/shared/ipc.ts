@@ -1,5 +1,6 @@
 // Tên các kênh IPC (giao tiếp giữa giao diện và tiến trình chính).
 // Đặt ở một chỗ để main và preload luôn dùng cùng một tên, tránh gõ sai.
+import type { AudioDerive } from './media/derived'
 import type { FrameRate, MediaAsset, Project, Resolution } from './project/schema'
 
 export const IpcChannels = {
@@ -110,7 +111,7 @@ export type MediaImportErrorCode = 'unsupported' | 'unreadable' | 'missing' | 'f
 /** Kết quả "Trích xuất âm thanh" từ một video: đường dẫn file .m4a vừa tạo (hoặc đã có sẵn). */
 export type ExtractAudioResult =
   | { ok: true; path: string }
-  | { ok: false; error: 'no-audio' | 'missing' | 'ffmpeg-missing' | 'failed'; detail?: string }
+  | { ok: false; error: 'no-audio' | 'mono' | 'missing' | 'ffmpeg-missing' | 'failed'; detail?: string }
 
 export type ImportMediaResult =
   | { ok: true; asset: MediaAsset }
@@ -213,8 +214,11 @@ export interface CutcapApi {
   pickMediaFiles(only?: 'video'): Promise<string[]>
   /** Đọc thông tin các file (ffprobe) để thêm vào dự án. */
   importMedia(paths: string[]): Promise<ImportMediaResult[]>
-  /** Tách tiếng của một video ra file .m4a (trong thư mục "Âm thanh trích xuất"). */
-  extractAudio(videoPath: string): Promise<ExtractAudioResult>
+  /**
+   * Tách tiếng của một video ra file .m4a (trong thư mục "Âm thanh trích xuất").
+   * mode = 'karaoke': tạo bản đã xóa giọng hát (từ video hoặc file âm thanh stereo).
+   */
+  extractAudio(path: string, mode?: AudioDerive): Promise<ExtractAudioResult>
   /** Chuẩn bị thumbnail + bản phát (tạo proxy chạy nền nếu cần). */
   prepareMedia(path: string): Promise<MediaPreview>
   /** Nhận cập nhật khi proxy tiến triển / xong / lỗi. Trả về hàm hủy đăng ký. */

@@ -29,7 +29,7 @@ const api: CutcapApi = {
 
   pickMediaFiles: (only) => ipcRenderer.invoke(IpcChannels.pickMediaFiles, only),
   importMedia: (paths) => ipcRenderer.invoke(IpcChannels.importMedia, paths),
-  extractAudio: (videoPath) => ipcRenderer.invoke(IpcChannels.extractAudio, videoPath),
+  extractAudio: (path, mode) => ipcRenderer.invoke(IpcChannels.extractAudio, path, mode),
   prepareMedia: (path) => ipcRenderer.invoke(IpcChannels.prepareMedia, path),
   onMediaUpdated: (callback) => subscribe<[MediaPreview]>(IpcChannels.mediaUpdated, callback),
   // Từ Electron 32, File.path đã bị bỏ; phải dùng webUtils để lấy đường dẫn file kéo thả

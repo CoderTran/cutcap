@@ -3,8 +3,9 @@
 import * as ops from '@shared/project/ops'
 import type { Id, TextAnimation, TextStyle, Transform } from '@shared/project/schema'
 import { applyText, applyTextAnimation, applyTextStyle, applyTransform } from '@shared/timeline/clipProps'
-import { canPlace, createTextClip, DEFAULT_TEXT_DURATION } from '@shared/timeline/clips'
+import { canPlace, createTextClip, DEFAULT_TEXT_DURATION, findClip } from '@shared/timeline/clips'
 import { editorStore } from './editorStore'
+import { editTimeFor } from './keyframeActions'
 import { projectStore } from './projectStore'
 
 const coalesce = (session: string | undefined) =>
@@ -42,6 +43,14 @@ export function setTextAnimation(clipId: Id, animation: TextAnimation, duration:
     .apply('history.textAnimation', (d) => applyTextAnimation(d, clipId, animation, duration), coalesce(session))
 }
 
+/** Đổi biến đổi tại đầu phát: thuộc tính đã có keyframe thì tạo/sửa keyframe ở đó (giống CapCut). */
 export function setTransform(clipId: Id, changes: Partial<Transform>, session?: string): void {
-  projectStore.getState().apply('history.transform', (d) => applyTransform(d, clipId, changes), coalesce(session))
+  projectStore.getState().apply(
+    'history.transform',
+    (d) => {
+      const clip = findClip(d, clipId)?.clip
+      if (clip) applyTransform(d, clipId, changes, editTimeFor(clip))
+    },
+    coalesce(session)
+  )
 }

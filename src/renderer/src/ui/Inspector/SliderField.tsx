@@ -1,6 +1,6 @@
 // Thanh trượt có nhãn + giá trị, dùng cho các thuộc tính clip.
 // Mỗi lần nhấn chuột → kéo → thả là một "phiên" (session): mọi thay đổi trong phiên gộp thành 1 bước Undo.
-import { useRef } from 'react'
+import { useRef, type ReactNode } from 'react'
 
 interface Props {
   label: string
@@ -16,9 +16,11 @@ interface Props {
   onChange: (value: number, session: string) => void
   /** Bấm đúp để về giá trị mặc định. */
   onReset?: () => void
+  /** Phần thêm ở cuối dòng tiêu đề, vd. nút keyframe ‹ ◇ ›. */
+  extra?: ReactNode
 }
 
-export function SliderField({ label, display, value, min, max, step, disabled, onChange, onReset }: Props): React.JSX.Element {
+export function SliderField({ label, display, value, min, max, step, disabled, onChange, onReset, extra }: Props): React.JSX.Element {
   const session = useRef('')
   const newSession = (): void => {
     session.current = `${label}:${performance.now()}`
@@ -29,6 +31,7 @@ export function SliderField({ label, display, value, min, max, step, disabled, o
       <span className="slider-head">
         <span>{label}</span>
         <b>{display}</b>
+        {extra}
       </span>
       <input
         type="range"

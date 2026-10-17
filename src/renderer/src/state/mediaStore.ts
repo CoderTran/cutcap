@@ -8,8 +8,8 @@ export const pathKey = (p: string): string => p.replace(/\//g, '\\').toLowerCase
 
 export interface ImportError {
   path: string
-  /** Lỗi nhập file, hoặc lỗi trích xuất âm thanh ('no-audio' | 'failed'). */
-  error: MediaImportErrorCode | 'no-audio' | 'failed'
+  /** Lỗi nhập file, hoặc lỗi trích xuất âm thanh / xóa giọng ('no-audio' | 'mono' | 'failed'). */
+  error: MediaImportErrorCode | 'no-audio' | 'mono' | 'failed'
 }
 
 export interface MediaState {

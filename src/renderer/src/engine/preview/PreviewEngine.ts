@@ -12,6 +12,7 @@ import { clipCssFilter } from '@shared/render/filters'
 import { placeLayer } from '@shared/render/geometry'
 import { projectDuration } from '@shared/timeline/clips'
 import { clipGainAt } from '@shared/timeline/clipProps'
+import { transformAt } from '@shared/timeline/keyframes'
 import { clampedSourceTime } from '@shared/timeline/transitions'
 import { timedClipsBetween, visualLayersAt, type TimedClip } from '@shared/timeline/evaluate'
 import { editorStore } from '../../state/editorStore'
@@ -284,7 +285,7 @@ export class PreviewEngine {
       }
       if (!source) continue
 
-      const p = placeLayer(srcW, srcH, W, H, clip.transform)
+      const p = placeLayer(srcW, srcH, W, H, transformAt(clip, t))
       const fx = layer.effect
       ctx.save()
       // Chuyển cảnh "phóng to": phóng cả lớp quanh TÂM KHUNG (giống zoompan của FFmpeg khi xuất)

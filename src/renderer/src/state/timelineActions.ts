@@ -1,9 +1,17 @@
 // Lệnh thao tác trên timeline: thả media, di chuyển, cắt mép, tách, xóa, sao chép/dán, chọn.
 // Logic tính toán nằm ở @shared/timeline (hàm thuần, có test); file này chỉ nối với store.
 import * as ops from '@shared/project/ops'
-import type { Id } from '@shared/project/schema'
+import type { Id, MediaAsset, Project } from '@shared/project/schema'
 import { MICROS_PER_SECOND, type Micros } from '@shared/project/time'
-import { createMediaClip, mainTrackFor, resolveDrop, trackKindForAsset } from '@shared/timeline/clips'
+import { createMediaClip, findClip, mainTrackFor, resolveDrop, trackKindForAsset } from '@shared/timeline/clips'
+import {
+  applyVocalRemoval,
+  canDetachAudio,
+  canRemoveVocals,
+  canRestoreVocals,
+  detachAudio as detachAudioClip,
+  restoreVocals
+} from '@shared/timeline/detach'
 import {
   applyMoves,
   applyTrim,
@@ -17,6 +25,8 @@ import {
   type TrimEdge
 } from '@shared/timeline/edit'
 import { editorStore } from './editorStore'
+import { extractAudioAssets } from './mediaActions'
+import { mediaStore, pathKey } from './mediaStore'
 import { projectStore } from './projectStore'
 
 const project = () => projectStore.getState().project
@@ -101,6 +111,88 @@ export function deleteSelected(): void {
   if (ids.length === 0) return
   apply('history.deleteClips', (d) => deleteClips(d, ids))
   editorStore.getState().clearSelection()
+}
+
+/**
+ * Tách âm thanh (chuột phải → "Tách âm thanh", Ctrl+Shift+S): tiếng của các clip video được đưa
+ * xuống track âm thanh thành clip riêng, clip video tắt tiếng. Cả lần tách = 1 bước Undo.
+ * Cần trích xuất file âm thanh trước (FFmpeg, vài giây) nên là hàm async.
+ */
+export async function detachAudioOf(clipIds: Id[], nameSuffix: string): Promise<void> {
+  const p = project()
+  const ids = clipIds.filter((id) => canDetachAudio(p, id))
+  if (ids.length === 0) return
+  const videoPath = (pr: Project, id: Id): string | null => {
+    const clip = findClip(pr, id)?.clip
+    return clip?.type === 'media' ? (pr.assets[clip.assetId]?.path ?? null) : null
+  }
+
+  const media = mediaStore.getState()
+  media.setImporting(true)
+  try {
+    const { byVideo, errors } = await extractAudioAssets(ids.map((id) => videoPath(p, id)!), nameSuffix)
+    const created: Id[] = []
+    // Kiểm tra lại trong apply: trong lúc chờ FFmpeg, người dùng có thể đã sửa/xóa clip
+    apply('history.detachAudio', (d) => {
+      for (const id of ids) {
+        const path = videoPath(d, id)
+        const asset = path ? byVideo.get(pathKey(path)) : undefined
+        const newId = asset ? detachAudioClip(d, id, asset) : null
+        if (newId) created.push(newId)
+      }
+    })
+    media.setImportErrors(errors)
+    if (created.length > 0) editorStore.getState().setSelection(created)
+  } finally {
+    media.setImporting(false)
+  }
+}
+
+/**
+ * Xóa giọng hát (karaoke, FFmpeg – không dùng AI) cho 1 clip âm thanh / video.
+ * @returns mã lỗi để hiện cho người dùng ('mono', 'failed'…), hoặc null nếu thành công
+ */
+export async function removeVocalsOf(clipId: Id, names: { vocalsSuffix: string; audioSuffix: string }): Promise<string | null> {
+  const p = project()
+  if (!canRemoveVocals(p, clipId)) return null
+  const clip = findClip(p, clipId)!.clip
+  const asset = clip.type === 'media' ? p.assets[clip.assetId] : undefined
+  if (!asset) return null
+
+  const media = mediaStore.getState()
+  media.setImporting(true)
+  try {
+    const key = pathKey(asset.path)
+    const karaoke = await extractAudioAssets([asset.path], names.vocalsSuffix, 'karaoke')
+    const removed = karaoke.byVideo.get(key)
+    if (!removed) return karaoke.errors[0]?.error ?? 'failed'
+    // Clip video: cần thêm tiếng gốc (để tách ra track âm thanh, và để "Khôi phục" sau này)
+    let plain: MediaAsset | undefined
+    if (asset.kind === 'video') {
+      const extracted = await extractAudioAssets([asset.path], names.audioSuffix, 'extract')
+      plain = extracted.byVideo.get(key)
+      if (!plain) return extracted.errors[0]?.error ?? 'failed'
+    }
+    let shown: Id | null = null
+    apply('history.removeVocals', (d) => {
+      shown = applyVocalRemoval(d, clipId, removed, plain)
+    })
+    if (shown) editorStore.getState().setSelection([shown])
+    return null
+  } finally {
+    media.setImporting(false)
+  }
+}
+
+/** "Khôi phục": trả clip đã xóa giọng về tiếng gốc (có giọng hát). */
+export function restoreVocalsOf(clipId: Id): void {
+  if (!canRestoreVocals(project(), clipId)) return
+  apply('history.restoreVocals', (d) => void restoreVocals(d, clipId))
+}
+
+/** Có clip nào trong danh sách tách âm thanh được không (để bật/tắt mục menu). */
+export function canDetachAny(clipIds: Id[]): boolean {
+  return clipIds.some((id) => canDetachAudio(project(), id))
 }
 
 /**

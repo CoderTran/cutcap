@@ -14,6 +14,8 @@ export interface ProbeInfo {
   videoCodec: string | null
   pixelFormat: string | null
   audioCodec: string | null
+  /** Số kênh âm thanh (1 = mono, 2 = stereo…); null nếu không có tiếng. */
+  audioChannels: number | null
   /** Tên định dạng container theo ffprobe, ví dụ "mov,mp4,m4a,3gp,3g2,mj2". */
   formatName: string
 }
@@ -30,6 +32,7 @@ export class ProbeError extends Error {
 interface FfprobeStream {
   codec_type?: string
   codec_name?: string
+  channels?: number
   width?: number
   height?: number
   pix_fmt?: string
@@ -97,6 +100,7 @@ export function parseProbeOutput(output: FfprobeOutput, filePath: string): Probe
     videoCodec: kind !== 'audio' ? (video?.codec_name ?? null) : null,
     pixelFormat: kind !== 'audio' ? (video?.pix_fmt ?? null) : null,
     audioCodec: audio?.codec_name ?? null,
+    audioChannels: audio?.channels ?? null,
     formatName: output.format?.format_name ?? ''
   }
 }

@@ -2,7 +2,7 @@
 // Hàm thuần – preview (Bước 5) và engine xuất video (Bước 6) cùng dùng, để hai bên luôn khớp nhau.
 import type { Clip, MediaAsset, MediaClip, Project, Track } from '../project/schema'
 import type { Micros } from '../project/time'
-import { clipEnd } from './clips'
+import { clipAssetId, clipEnd } from './clips'
 import {
   NO_EFFECT,
   clampedSourceTime,
@@ -52,8 +52,9 @@ export function visualLayersAt(project: Project, t: Micros): VisualLayer[] {
     track.clips.forEach((clip, i) => {
       const span = visibleSpan(project, track, i)
       if (t < span.from || t >= span.to) return
-      const asset = clip.type === 'text' ? undefined : project.assets[clip.assetId]
-      if (clip.type !== 'text' && !asset) return
+      const assetId = clipAssetId(clip)
+      const asset = assetId ? project.assets[assetId] : undefined
+      if (assetId && !asset) return
 
       let effect = NO_EFFECT
       const tin = transitionAt(project, track, i)

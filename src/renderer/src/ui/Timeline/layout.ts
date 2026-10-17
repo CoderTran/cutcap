@@ -11,7 +11,7 @@ export const TAIL_PADDING_PX = 600
 /** Kéo/thả cách mốc dưới bấy nhiêu pixel thì tự hít vào mốc đó. */
 export const SNAP_PX = 8
 
-const TRACK_HEIGHT: Record<TrackKind, number> = { video: 72, audio: 48, text: 42, sticker: 42 }
+const TRACK_HEIGHT: Record<TrackKind, number> = { video: 72, audio: 48, text: 42, sticker: 42, effect: 34 }
 
 export function trackHeight(track: Pick<Track, 'kind'>): number {
   return TRACK_HEIGHT[track.kind]

@@ -9,9 +9,9 @@
 // Toạ độ: thời điểm t nằm ở x = HEADER_WIDTH + timeToPx(t) tính từ mép trái nội dung.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { Id, Track } from '@shared/project/schema'
+import type { Clip, Id, MediaAsset, Track } from '@shared/project/schema'
 import { MICROS_PER_SECOND, formatDuration } from '@shared/project/time'
-import { DEFAULT_IMAGE_DURATION, projectDuration, resolveDrop, type DropTarget } from '@shared/timeline/clips'
+import { DEFAULT_IMAGE_DURATION, clipAssetId, projectDuration, resolveDrop, type DropTarget } from '@shared/timeline/clips'
 import { clampZoom, pxToTime, timeToPx } from '@shared/timeline/ruler'
 import { collectSnapPoints, snapSpan } from '@shared/timeline/snap'
 import { editorStore, useEditorStore } from '../../state/editorStore'
@@ -237,6 +237,11 @@ export function Timeline(): React.JSX.Element {
     }
   }
 
+  const assetOf = (clip: Clip): MediaAsset | undefined => {
+    const id = clipAssetId(clip)
+    return id ? project.assets[id] : undefined
+  }
+
   return (
     <div className="timeline">
       <TimelineToolbar durationUs={duration} onZoom={zoomFromToolbar} onFit={fitToView} />
@@ -273,7 +278,7 @@ export function Timeline(): React.JSX.Element {
                     key={clip.id}
                     clip={clip}
                     trackKind={track.kind}
-                    asset={clip.type === 'text' ? undefined : project.assets[clip.assetId]}
+                    asset={assetOf(clip)}
                     pxPerSecond={pps}
                     selected={selectedSet.has(clip.id)}
                     dragging={draggingSet.has(clip.id)}

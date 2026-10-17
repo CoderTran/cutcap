@@ -1,7 +1,8 @@
 // Các phép tính về clip trên timeline: tạo clip từ media, kiểm tra chồng lấn, chọn track phù hợp.
 // Hàm thuần – dùng chung cho giao diện, preview và (sau này) engine xuất video.
 import { defaultColorAdjust, defaultTransform, createId } from '../project/factory'
-import type { Clip, Id, MediaAsset, MediaClip, Project, TextClip, TextStyle, Track, TrackKind } from '../project/schema'
+import type { Clip, EffectClip, Id, MediaAsset, MediaClip, Project, TextClip, TextStyle, Track, TrackKind } from '../project/schema'
+import { DEFAULT_EFFECT_DURATION } from '../render/effects'
 import { MICROS_PER_SECOND, type Micros } from '../project/time'
 
 /** Ảnh tĩnh khi thả vào timeline sẽ dài bấy nhiêu (giống CapCut: 3 giây). */
@@ -25,6 +26,24 @@ export function defaultTextStyle(): TextStyle {
 }
 
 /** Tạo clip chữ mới ở giữa khung hình. */
+/** Media mà clip lấy hình/tiếng (video, ảnh, âm thanh, nhãn dán); null với chữ và hiệu ứng. */
+export function clipAssetId(clip: Clip): Id | null {
+  return clip.type === 'media' || clip.type === 'sticker' ? clip.assetId : null
+}
+
+/** Clip hiệu ứng mới tại `start`, dài mặc định 3 giây. */
+export function createEffectClip(start: Micros, effectId: string): EffectClip {
+  return {
+    id: createId(),
+    type: 'effect',
+    start: Math.max(0, Math.round(start)),
+    duration: DEFAULT_EFFECT_DURATION,
+    effectId,
+    transform: defaultTransform(),
+    keyframes: {}
+  }
+}
+
 export function createTextClip(start: Micros, text: string): TextClip {
   return {
     id: createId(),

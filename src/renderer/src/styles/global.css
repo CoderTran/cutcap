@@ -428,6 +428,16 @@ kbd {
 .preset-sample {
   font-size: 18px;
 }
+/* Ô xem thử hiệu ứng: canvas co theo ô, giữ tỉ lệ 16:10 */
+.effect-thumb {
+  display: block;
+  height: auto;
+}
+.effect-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .preset-thumb.placeholder {
   background: linear-gradient(135deg, #3b2f56, #1f5d6b 60%, #b98e3d);
 }
@@ -1273,6 +1283,9 @@ kbd {
 }
 .tl-clip.kind-text {
   background: #7a5612;
+}
+.tl-clip.kind-effect {
+  background: #5b3fa8;
 }
 .tl-clip.kind-sticker {
   background: #6d2a66;

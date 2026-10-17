@@ -3,27 +3,30 @@
 //   - clip video/ảnh:  Video | Âm thanh | Tốc độ | Điều chỉnh | Chuyển cảnh   (tab không áp dụng thì ẩn)
 //   - clip âm thanh:   Âm thanh | Tốc độ
 //   - clip chữ:        Văn bản | Hoạt ảnh
+//   - clip hiệu ứng:   Hiệu ứng
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Clip, MediaAsset, Track } from '@shared/project/schema'
-import { findClip } from '@shared/timeline/clips'
+import { clipAssetId, findClip } from '@shared/timeline/clips'
 import { canHaveTransition } from '@shared/timeline/transitions'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/projectStore'
 import { AudioSection, DetachAudioSection, InfoSection, SpeedSection, VocalRemovalSection } from './ClipInfoPanel'
 import { ColorSection } from './ColorSection'
+import { EffectPanel } from './EffectPanel'
 import { ProjectDetails } from './ProjectDetails'
 import { ProjectSettingsPanel } from './ProjectSettingsPanel'
 import { TextPanel } from './TextPanel'
 import { TransformSection } from './TransformSection'
 import { TransitionSection } from './TransitionSection'
 
-type TabId = 'project' | 'details' | 'video' | 'audio' | 'speed' | 'adjust' | 'transition' | 'text' | 'animation'
+type TabId = 'project' | 'details' | 'video' | 'audio' | 'speed' | 'adjust' | 'transition' | 'text' | 'animation' | 'effect'
 
 /** Các tab phù hợp với clip đang chọn. */
 function tabsFor(clip: Clip | null, track: Track | null, asset: MediaAsset | undefined, transitionable: boolean): TabId[] {
   if (!clip || !track) return ['project', 'details']
   if (clip.type === 'text') return ['text', 'animation']
+  if (clip.type === 'effect') return ['effect']
   if (!asset) return []
   const timed = asset.kind !== 'image'
   if (asset.kind === 'audio') return ['audio', 'speed']
@@ -45,7 +48,8 @@ export function Inspector(): React.JSX.Element {
   const found = selected.length === 1 ? findClip(project, selected[0]) : null
   const clip = found?.clip ?? null
   const track = found?.track ?? null
-  const asset = clip && clip.type !== 'text' ? project.assets[clip.assetId] : undefined
+  const assetId = clip ? clipAssetId(clip) : null
+  const asset = assetId ? project.assets[assetId] : undefined
   const transitionable = !!(clip && track && canHaveTransition(project, track, track.clips.indexOf(clip)))
   const tabs = tabsFor(clip, track, asset, transitionable)
 
@@ -81,6 +85,7 @@ export function Inspector(): React.JSX.Element {
         {clip?.type === 'text' && track && (current === 'text' || current === 'animation') && (
           <TextPanel clip={clip} track={track} section={current} />
         )}
+        {clip?.type === 'effect' && track && <EffectPanel clip={clip} disabled={track.locked} />}
         {clip?.type === 'media' && track && (
           <div className="form">
             {locked && <p className="hint">🔒 {t('clip.locked')}</p>}

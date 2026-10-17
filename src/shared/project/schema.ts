@@ -61,7 +61,7 @@ export interface MediaAsset {
 
 // ───────────────────────── Track và clip ─────────────────────────
 
-export const TRACK_KINDS = ['video', 'audio', 'text', 'sticker'] as const
+export const TRACK_KINDS = ['video', 'audio', 'text', 'sticker', 'effect'] as const
 export type TrackKind = (typeof TRACK_KINDS)[number]
 
 export interface Track {
@@ -186,7 +186,19 @@ export interface StickerClip extends ClipBase {
   transform: Transform
 }
 
-export type Clip = MediaClip | TextClip | StickerClip
+/**
+ * Hiệu ứng video (tab "Hiệu ứng"): nằm trên track "Hiệu ứng", tác động lên mọi thứ ở các track
+ * bên dưới trong khoảng thời gian của clip. Xem shared/render/effects.ts.
+ */
+export interface EffectClip extends ClipBase {
+  type: 'effect'
+  /** Mã hiệu ứng trong EFFECTS (mã lạ – vd. từ phiên bản mới hơn – thì bỏ qua khi vẽ). */
+  effectId: string
+  /** Không dùng (hiệu ứng tác động cả khung hình) – giữ để mọi clip có cùng cấu trúc. */
+  transform: Transform
+}
+
+export type Clip = MediaClip | TextClip | StickerClip | EffectClip
 
 // ───────────────────────── Dự án ─────────────────────────
 

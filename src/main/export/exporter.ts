@@ -5,7 +5,7 @@ import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { EncoderId, ExportProgress, ExportRequest, ExportResult, TextFrameSet } from '@shared/ipc'
 import { canvasSize } from '@shared/project/canvas'
-import { projectDuration } from '@shared/timeline/clips'
+import { clipAssetId, projectDuration } from '@shared/timeline/clips'
 import { ProcessError, runProcess } from '../media/processRunner'
 import { buildExportGraph, sec, type TextFramesOnDisk } from './graphBuilder'
 import { detectEncoders, encoderArgs, pixelFormatFor } from './encoders'
@@ -47,7 +47,7 @@ export class Exporter {
       const durationUs = projectDuration(project)
       if (durationUs === 0) throw new ExportValidationError('empty')
       const missing = Object.values(project.assets)
-        .filter((a) => project.tracks.some((t) => t.clips.some((c) => c.type !== 'text' && c.assetId === a.id)))
+        .filter((a) => project.tracks.some((t) => t.clips.some((c) => clipAssetId(c) === a.id)))
         .filter((a) => !existsSync(a.path))
       if (missing.length > 0) throw new ExportValidationError(`missing:${missing.map((a) => a.name).join(', ')}`)
 

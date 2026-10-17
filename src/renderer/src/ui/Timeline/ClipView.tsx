@@ -104,13 +104,14 @@ export const ClipView = memo(function ClipView({
   onPointerDown,
   onContextMenu
 }: Props) {
+  const { t } = useTranslation()
   const left = timeToPx(clip.start, pxPerSecond)
   const width = Math.max(2, timeToPx(clip.duration, pxPerSecond))
-  const name = clip.type === 'text' ? clip.text : (asset?.name ?? '?')
+  const name =
+    clip.type === 'text' ? clip.text : clip.type === 'effect' ? t(`effects.names.${clip.effectId}`, { defaultValue: clip.effectId }) : (asset?.name ?? '?')
   const media = clip.type === 'media' ? clip : null
   const fades = media && asset?.hasAudio ? effectiveFades(media) : null
   const audioOnly = asset?.kind === 'audio'
-  const { t } = useTranslation()
   const hint = t('keyframe.dragHint')
 
   return (
@@ -135,6 +136,7 @@ export const ClipView = memo(function ClipView({
       <div className="tl-clip-body">
         {asset && <MediaStrip clip={clip} asset={asset} pxPerSecond={pxPerSecond} />}
         {clip.type === 'text' && <span className="tl-clip-text">T</span>}
+        {clip.type === 'effect' && <span className="tl-clip-text">✦</span>}
       </div>
 
       {/* Hình tam giác fade: phần tối phía trên đường dốc = âm lượng đang nhỏ dần/to dần */}

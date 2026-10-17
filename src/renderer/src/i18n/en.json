@@ -54,7 +54,8 @@
       "video": "Video",
       "audio": "Audio",
       "text": "Text",
-      "sticker": "Sticker"
+      "sticker": "Sticker",
+      "effect": "Effect"
     },
     "hide": "Hide / show track",
     "mute": "Mute / unmute",
@@ -102,7 +103,9 @@
     "restoreVocals": "Restore vocals",
     "keyframe": "Keyframe",
     "clearKeyframes": "Clear keyframes",
-    "moveKeyframe": "Move keyframe"
+    "moveKeyframe": "Move keyframe",
+    "addEffect": "Add effect",
+    "changeEffect": "Change effect"
   },
   "status": {
     "loading": "Loading…",
@@ -161,7 +164,8 @@
       "adjust": "Adjust",
       "transition": "Transition",
       "text": "Text",
-      "animation": "Animation"
+      "animation": "Animation",
+      "effect": "Effect"
     }
   },
   "clip": {
@@ -362,7 +366,8 @@
     "audio": "Audio",
     "text": "Text",
     "transitions": "Transitions",
-    "filters": "Filters"
+    "filters": "Filters",
+    "effects": "Effects"
   },
   "textPresets": {
     "heading": "Text presets",
@@ -440,5 +445,66 @@
     "next": "Next keyframe",
     "outside": "Move the playhead inside the clip to set a keyframe",
     "dragHint": "drag to change its time, click to go there"
+  },
+  "effects": {
+    "names": {
+      "bw": "Black & white",
+      "noir": "Noir",
+      "sepia": "Sepia",
+      "invert": "Negative",
+      "cool": "Cool tone",
+      "warm": "Warm tone",
+      "vivid": "Vivid",
+      "faded": "Faded",
+      "rainbow": "Rainbow shift",
+      "blur": "Blur",
+      "dreamy": "Dreamy",
+      "glow": "Glow",
+      "flash": "Flash",
+      "strobe": "Strobe",
+      "fadeBlack": "Fade to black",
+      "fadeWhite": "Fade in from white",
+      "shake": "Shake",
+      "shakeHard": "Hard shake",
+      "heartbeat": "Heartbeat",
+      "zoomPunch": "Zoom punch",
+      "zoomIn": "Slow zoom in",
+      "zoomOut": "Slow zoom out",
+      "sway": "Sway",
+      "swing": "Swing",
+      "cinema": "Cinema bars",
+      "vignette": "Vignette",
+      "lens": "Round lens",
+      "mirrorH": "Mirror horizontal",
+      "mirrorV": "Mirror vertical",
+      "kaleido": "Kaleidoscope",
+      "split2": "Split 2",
+      "split3": "Split 3",
+      "split4": "Split 4",
+      "split9": "Split 9",
+      "upsideDown": "Upside down",
+      "rgbSplit": "RGB split",
+      "glitch": "Glitch",
+      "vhs": "VHS",
+      "oldFilm": "Old film",
+      "grain": "Film grain",
+      "scanlines": "Old TV",
+      "pixel": "Pixelate"
+    },
+    "categories": {
+      "color": "Color",
+      "light": "Light",
+      "motion": "Motion",
+      "frame": "Frames & split screen",
+      "retro": "Retro & noise"
+    },
+    "search": "Search effects",
+    "noMatch": "No matching effects.",
+    "hint": "Hover a tile to preview. Click to add it at the playhead – an effect applies to everything below it.",
+    "addHint": "Click to add at the playhead",
+    "panelTitle": "Effect",
+    "current": "Current effect",
+    "panelHint": "Drag the edges of the effect clip on the timeline to change when it applies; it affects every track below.",
+    "unknown": "Unknown effect ({{id}})"
   }
 }

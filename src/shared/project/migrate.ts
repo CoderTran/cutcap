@@ -171,6 +171,9 @@ function parseClip(v: unknown, where: string): Clip {
         vocalsRemovedFrom: typeof v.vocalsRemovedFrom === 'string' && v.vocalsRemovedFrom ? v.vocalsRemovedFrom : null
       }
     }
+    case 'effect':
+      // Mã hiệu ứng giữ nguyên kể cả khi không biết (file từ phiên bản mới hơn) – lúc vẽ sẽ bỏ qua
+      return { ...base, type: 'effect', effectId: typeof v.effectId === 'string' && v.effectId ? v.effectId : 'bw' }
     case 'text': {
       const s = isObj(v.style) ? v.style : {}
       return {

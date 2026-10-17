@@ -19,6 +19,8 @@ import { editorStore } from '../../state/editorStore'
 import { mediaStore, pathKey } from '../../state/mediaStore'
 import { projectStore } from '../../state/projectStore'
 import { drawTextClip, type Rect } from '../text/drawText'
+import { findEffect } from '@shared/render/effects'
+import { EffectPainter } from '../effects/applyEffect'
 import { MediaElementPool } from './MediaElementPool'
 
 /** Vị trí một lớp hình vừa vẽ (pixel canvas) – để bấm chọn và kéo trên khung preview. */
@@ -40,6 +42,7 @@ export class PreviewEngine {
   private readonly audio = new AudioContext({ latencyHint: 'interactive' })
   private readonly pool = new MediaElementPool(() => this.requestRender(), this.audio)
   private readonly unsubscribers: (() => void)[] = []
+  private readonly effects = new EffectPainter()
   private raf = 0
   private dirty = true
   private playing = false
@@ -254,6 +257,12 @@ export class PreviewEngine {
     const selected = editorStore.getState().selectedClipIds
     for (const layer of visualLayersAt(project, t)) {
       const { clip, asset } = layer
+      if (clip.type === 'effect') {
+        // Hiệu ứng: tác động lên mọi thứ đã vẽ (các track bên dưới), thời gian tính từ đầu clip
+        const def = findEffect(clip.effectId)
+        if (def) this.effects.apply(ctx, def, W, H, (t - clip.start) / MICROS_PER_SECOND)
+        continue
+      }
       if (clip.type === 'text') {
         // Đang dừng và đang chọn chữ → hiện chữ đầy đủ (bỏ qua hiệu ứng xuất hiện) để dễ chỉnh sửa
         const editing = !this.playing && clip.animationIn !== 'none' && selected.includes(clip.id)

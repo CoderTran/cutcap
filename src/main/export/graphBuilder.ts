@@ -15,7 +15,9 @@ import { MICROS_PER_SECOND, type Micros } from '@shared/project/time'
 import { clipFfmpegFilters } from '@shared/render/filters'
 import { placeLayer } from '@shared/render/geometry'
 import { clipEnd, projectDuration } from '@shared/timeline/clips'
+import { effectStatements } from './effectFilters'
 import { effectiveFades } from '@shared/timeline/clipProps'
+import { findEffect } from '@shared/render/effects'
 import { ffmpegValueExpr, hasKeyframes, keyframesOf } from '@shared/timeline/keyframes'
 import { transitionAt, type ActiveTransition } from '@shared/timeline/transitions'
 
@@ -237,6 +239,26 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
   for (let ti = project.tracks.length - 1; ti >= 0; ti--) {
     const track = project.tracks[ti]
     if (track.hidden || track.kind === 'audio') continue
+    if (track.kind === 'effect') {
+      // Hiệu ứng: tác động lên khung hình ĐÃ GHÉP từ các track bên dưới, chỉ trong khoảng của clip.
+      // Tách 1 nhánh, cắt đúng khoảng (đỡ tốn công xử lý phần còn lại), áp hiệu ứng, phủ lại lên.
+      for (const clip of track.clips) {
+        const def = clip.type === 'effect' ? findEffect(clip.effectId) : undefined
+        if (!def) continue // mã hiệu ứng lạ (vd. từ phiên bản mới hơn) → bỏ qua
+        const uid = `e${layerIndex}`
+        const out = `o${layerIndex}`
+        filters.push(`[${current}]split[${uid}keep][${uid}src]`)
+        filters.push(`[${uid}src]trim=start=${sec(clip.start)}:end=${sec(clipEnd(clip))}[${uid}cut]`)
+        filters.push(...effectStatements(def, `${uid}cut`, `${uid}fx`, { W, H, fps, start: clip.start, uid }))
+        filters.push(
+          `[${uid}keep][${uid}fx]overlay=x=0:y=0:eof_action=pass:repeatlast=0:` +
+            `enable='between(t,${sec(clip.start)},${sec(clipEnd(clip) - 1)})'[${out}]`
+        )
+        current = out
+        layerIndex++
+      }
+      continue
+    }
     for (const [clipIndex, clip] of track.clips.entries()) {
       if (clip.type === 'text') {
         // Chữ: [các khung hiệu ứng] + [ảnh tĩnh lặp lại] nối tiếp nhau, full khung hình, chồng ở góc 0,0
@@ -265,6 +287,7 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
         layerIndex++
         continue
       }
+      if (clip.type !== 'media' && clip.type !== 'sticker') continue
       const asset = project.assets[clip.assetId]
       if (!asset || asset.kind === 'audio') continue
 

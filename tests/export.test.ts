@@ -1,6 +1,6 @@
 // Test xuất video: phần dựng lệnh (hàm thuần) + xuất thật bằng ffmpeg rồi đọc lại từng điểm ảnh.
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,7 +10,8 @@ import { createEmptyProject } from '@shared/project/factory'
 import * as ops from '@shared/project/ops'
 import type { MediaAsset, Project } from '@shared/project/schema'
 import { ffmpegColorFilters, saturateMatrix } from '@shared/render/colorMath'
-import { createMediaClip } from '@shared/timeline/clips'
+import { EFFECTS } from '@shared/render/effects'
+import { createEffectClip, createMediaClip } from '@shared/timeline/clips'
 import { Exporter } from '../src/main/export/exporter'
 import { atempoChain, buildExportGraph } from '../src/main/export/graphBuilder'
 
@@ -221,6 +222,64 @@ describe.skipIf(!existsSync(ffmpeg))('xuất video thật bằng ffmpeg', () => 
     expect(late - early).toBeGreaterThan(10)
     expect(late - early).toBeLessThan(18)
   }, 120_000)
+
+  it('hiệu ứng: cả 42 hiệu ứng đều xuất được (FFmpeg chạy không lỗi)', async () => {
+    // Nền: ảnh nửa trái đỏ / nửa phải xanh, 1.2s; hiệu ứng phủ 0.2–1.0s
+    const half = join(dir, 'Nửa.png')
+    execFileSync(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=320x360', '-f', 'lavfi', '-i', 'color=c=blue:s=320x360',
+      '-filter_complex', '[0][1]hstack', '-frames:v', '1', '-update', '1', half])
+    const failures: string[] = []
+    for (const def of EFFECTS) {
+      const p = createEmptyProject('fx')
+      p.assets.half = { id: 'half', kind: 'image', path: half, name: 'half', durationUs: 0, width: 640, height: 360, fps: null, hasAudio: false }
+      ops.addClip(p, p.tracks[0].id, { ...createMediaClip(p.assets.half, 0), duration: 1.2 * S })
+      ops.addClip(p, ops.addTrack(p, 'effect'), { ...createEffectClip(0.2 * S, def.id), duration: 0.8 * S })
+      const g = buildExportGraph(p, { width: 854, height: 480, fps: 30, pixelFormat: 'yuv420p' })
+      const graphFile = join(dir, `fx-${def.id}.txt`)
+      writeFileSync(graphFile, g.filterGraph)
+      const r = spawnSync(ffmpeg, ['-hide_banner', '-loglevel', 'error', ...g.inputArgs, '-/filter_complex', graphFile,
+        '-map', `[${g.videoLabel}]`, '-map', `[${g.audioLabel}]`, '-t', '1.2', '-f', 'null', '-'], { encoding: 'utf8' })
+      if (r.status !== 0) failures.push(`${def.id}: ${r.stderr.trim().split('\n').slice(-2).join(' | ')}`)
+    }
+    expect(failures).toEqual([])
+  }, 300_000)
+
+  it('hiệu ứng: hình ra đúng (gương, lật, điện ảnh, âm bản, đen trắng, chia 4, chớp sáng)', async () => {
+    const half = join(dir, 'Nửa.png') // tạo ở test trên: trái đỏ, phải xanh
+    const run = async (effectId: string): Promise<string> => {
+      const p = createEmptyProject('fx')
+      p.settings.resolution = '720p'
+      p.assets.half = { id: 'half', kind: 'image', path: half, name: 'half', durationUs: 0, width: 640, height: 360, fps: null, hasAudio: false }
+      ops.addClip(p, p.tracks[0].id, { ...createMediaClip(p.assets.half, 0), duration: 1 * S })
+      ops.addClip(p, ops.addTrack(p, 'effect'), { ...createEffectClip(0, effectId), duration: 1 * S })
+      const out = join(dir, `fx-${effectId}.mp4`)
+      const exporter = new Exporter({ ffmpegExe: ffmpeg, tempDir: join(dir, 'tmp'), onProgress: () => {} })
+      const result = await exporter.run({ project: p, settings: { outputPath: out, resolution: '720p', fps: 30, quality: 'standard', encoder: 'libx264' }, textFrames: [] })
+      expect(result.status).toBe('done')
+      return out
+    }
+    const red = [255, 0, 0]
+    const blue = [0, 0, 255]
+    // Gương ngang: nửa phải = nửa trái lật → đỏ
+    expect(near(pixelAt(await run('mirrorH'), 0.5, 960, 360), red)).toBe(true)
+    // Lộn ngược theo chiều dọc: trái vẫn đỏ; chia 4: ô trên trái là cả khung thu nhỏ (trái đỏ, phải xanh)
+    expect(near(pixelAt(await run('upsideDown'), 0.5, 200, 100), red)).toBe(true)
+    const split4 = await run('split4')
+    expect(near(pixelAt(split4, 0.5, 100, 180), red)).toBe(true)
+    expect(near(pixelAt(split4, 0.5, 540, 180), blue)).toBe(true)
+    expect(near(pixelAt(split4, 0.5, 740, 180), red)).toBe(true)
+    // Điện ảnh: dải đen 12% trên/dưới
+    const cinema = await run('cinema')
+    expect(near(pixelAt(cinema, 0.5, 200, 20), [0, 0, 0])).toBe(true)
+    expect(near(pixelAt(cinema, 0.5, 200, 360), red)).toBe(true)
+    // Âm bản: đỏ → xanh lơ; đen trắng: đỏ → xám 0.2126 × 255 ≈ 54 (công thức grayscale của CSS)
+    expect(near(pixelAt(await run('invert'), 0.5, 200, 360), [0, 255, 255])).toBe(true)
+    expect(near(pixelAt(await run('bw'), 0.5, 200, 360), [54, 54, 54])).toBe(true)
+    // Chớp sáng: đầu mỗi giây gần như trắng (0.9), sau đó tắt dần
+    const flash = await run('flash')
+    expect(pixelAt(flash, 0, 200, 360)[1]).toBeGreaterThan(200)
+    expect(near(pixelAt(flash, 0.9, 200, 360), red, 25)).toBe(true)
+  }, 300_000)
 
   it('hủy giữa chừng: không để lại file dở dang', async () => {
     // Video dài 40s để kịp hủy

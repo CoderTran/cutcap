@@ -54,7 +54,8 @@
       "video": "Video",
       "audio": "Âm thanh",
       "text": "Chữ",
-      "sticker": "Sticker"
+      "sticker": "Sticker",
+      "effect": "Hiệu ứng"
     },
     "hide": "Ẩn / hiện track",
     "mute": "Tắt / bật tiếng",
@@ -102,7 +103,9 @@
     "restoreVocals": "Khôi phục giọng hát",
     "keyframe": "Keyframe",
     "clearKeyframes": "Xóa keyframe",
-    "moveKeyframe": "Dời keyframe"
+    "moveKeyframe": "Dời keyframe",
+    "addEffect": "Thêm hiệu ứng",
+    "changeEffect": "Đổi hiệu ứng"
   },
   "status": {
     "loading": "Đang tải…",
@@ -161,7 +164,8 @@
       "adjust": "Điều chỉnh",
       "transition": "Chuyển cảnh",
       "text": "Văn bản",
-      "animation": "Hoạt ảnh"
+      "animation": "Hoạt ảnh",
+      "effect": "Hiệu ứng"
     }
   },
   "clip": {
@@ -362,7 +366,8 @@
     "audio": "Âm thanh",
     "text": "Văn bản",
     "transitions": "Chuyển tiếp",
-    "filters": "Bộ lọc"
+    "filters": "Bộ lọc",
+    "effects": "Hiệu ứng"
   },
   "textPresets": {
     "heading": "Mẫu văn bản",
@@ -440,5 +445,66 @@
     "next": "Tới keyframe sau",
     "outside": "Đưa đầu phát vào trong clip để đặt keyframe",
     "dragHint": "kéo để đổi thời điểm, bấm để tới đó"
+  },
+  "effects": {
+    "names": {
+      "bw": "Đen trắng",
+      "noir": "Noir tương phản",
+      "sepia": "Ảnh cũ nâu",
+      "invert": "Âm bản",
+      "cool": "Tông lạnh",
+      "warm": "Tông ấm",
+      "vivid": "Rực rỡ",
+      "faded": "Phai màu",
+      "rainbow": "Cầu vồng đổi màu",
+      "blur": "Mờ ảo",
+      "dreamy": "Mơ màng",
+      "glow": "Phát sáng",
+      "flash": "Lóe sáng",
+      "strobe": "Chớp tắt",
+      "fadeBlack": "Tối dần",
+      "fadeWhite": "Sáng dần vào",
+      "shake": "Rung lắc",
+      "shakeHard": "Rung mạnh",
+      "heartbeat": "Nhịp tim",
+      "zoomPunch": "Zoom giật",
+      "zoomIn": "Phóng chậm",
+      "zoomOut": "Thu chậm",
+      "sway": "Lắc lư",
+      "swing": "Đung đưa",
+      "cinema": "Điện ảnh",
+      "vignette": "Viền tối",
+      "lens": "Ống kính tròn",
+      "mirrorH": "Gương ngang",
+      "mirrorV": "Gương dọc",
+      "kaleido": "Vạn hoa",
+      "split2": "Chia 2 màn hình",
+      "split3": "Chia 3 màn hình",
+      "split4": "Chia 4 màn hình",
+      "split9": "Chia 9 màn hình",
+      "upsideDown": "Lộn ngược",
+      "rgbSplit": "Dải xếp chồng",
+      "glitch": "Nhiễu điện tử",
+      "vhs": "VHS chấm",
+      "oldFilm": "Phim cũ",
+      "grain": "Nhiễu hạt",
+      "scanlines": "TV cũ",
+      "pixel": "Điểm ảnh"
+    },
+    "categories": {
+      "color": "Màu sắc",
+      "light": "Ánh sáng",
+      "motion": "Chuyển động",
+      "frame": "Khung & chia màn hình",
+      "retro": "Retro & nhiễu"
+    },
+    "search": "Tìm hiệu ứng",
+    "noMatch": "Không có hiệu ứng nào khớp.",
+    "hint": "Rê chuột lên ô để xem thử. Bấm để thêm vào timeline tại đầu phát – hiệu ứng tác động lên mọi thứ bên dưới nó.",
+    "addHint": "Bấm để thêm tại đầu phát",
+    "panelTitle": "Hiệu ứng",
+    "current": "Đang dùng",
+    "panelHint": "Kéo 2 mép clip hiệu ứng trên timeline để đổi khoảng thời gian; hiệu ứng tác động lên mọi track bên dưới.",
+    "unknown": "Hiệu ứng lạ ({{id}})"
   }
 }

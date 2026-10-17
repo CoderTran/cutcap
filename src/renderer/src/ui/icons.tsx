@@ -45,6 +45,8 @@ const PATHS = {
   ratio: 'M4 6h16v12H4zm4 4h8',
   rotate: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  // ngôi sao lấp lánh (Hiệu ứng)
+  sparkle: 'M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
   cut: 'M6 6a2.5 2.5 0 1 0 0 .01M6 18a2.5 2.5 0 1 0 0 .01M8 7.5 20 17M8 16.5 20 7',
   paste: 'M9 4h6v3H9zM7 5H5v15h14V5h-2',
   // khung video + nốt nhạc tách ra

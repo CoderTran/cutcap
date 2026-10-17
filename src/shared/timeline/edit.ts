@@ -9,7 +9,7 @@ import { createId } from '../project/factory'
 import * as ops from '../project/ops'
 import type { Clip, Id, Project, Track, TrackKind } from '../project/schema'
 import type { Micros } from '../project/time'
-import { canPlace, clipEnd, findClip } from './clips'
+import { canPlace, clipAssetId, clipEnd, findClip } from './clips'
 import { clampFades } from './clipProps'
 import { shiftKeyframes } from './keyframes'
 
@@ -242,7 +242,11 @@ export function copyClips(project: Project, clipIds: Id[]): ClipboardItem[] {
  * @returns id các clip mới
  */
 export function pasteClips(draft: Project, items: ClipboardItem[], at: Micros): Id[] {
-  const usable = items.filter((i) => i.clip.type === 'text' || draft.assets[i.clip.assetId])
+  // Clip lấy từ media: chỉ dán được nếu media còn trong thư viện (chữ, hiệu ứng: luôn dán được)
+  const usable = items.filter((i) => {
+    const id = clipAssetId(i.clip)
+    return id === null || !!draft.assets[id]
+  })
   if (usable.length === 0) return []
   const base = Math.min(...usable.map((i) => i.clip.start))
   const newIds: Id[] = []

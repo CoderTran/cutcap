@@ -4,51 +4,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EFFECT_CATEGORIES, EFFECTS, type EffectDef } from '@shared/render/effects'
 import { EffectPainter } from '../../engine/effects/applyEffect'
+import { THUMB_H, THUMB_W, sampleScene } from '../../engine/effects/sampleScene'
 import { addEffectAtPlayhead } from '../../state/effectActions'
+import { HelpTip } from '../HelpTip'
 import { Icon } from '../icons'
 
-const THUMB_W = 192
-const THUMB_H = 120
-/** Thời điểm vẽ ô khi đứng yên (giây tính từ đầu hiệu ứng) – đa số hiệu ứng đã "lên hình" rõ. */
-const STILL_T = 0.4
-
-/** Cảnh mẫu tự vẽ (hoàng hôn, núi, nhà) – không cần ảnh có bản quyền. Vẽ 1 lần, dùng chung. */
-let sample: OffscreenCanvas | null = null
-function sampleScene(): OffscreenCanvas {
-  if (sample) return sample
-  const c = new OffscreenCanvas(THUMB_W, THUMB_H)
-  const g = c.getContext('2d')!
-  const sky = g.createLinearGradient(0, 0, 0, THUMB_H)
-  sky.addColorStop(0, '#2b3a8c')
-  sky.addColorStop(0.55, '#e0607e')
-  sky.addColorStop(1, '#f7b267')
-  g.fillStyle = sky
-  g.fillRect(0, 0, THUMB_W, THUMB_H)
-  g.fillStyle = '#ffe08a'
-  g.beginPath()
-  g.arc(THUMB_W * 0.68, THUMB_H * 0.55, THUMB_H * 0.16, 0, Math.PI * 2)
-  g.fill()
-  g.fillStyle = '#3d2c5a'
-  g.beginPath()
-  g.moveTo(0, THUMB_H * 0.8)
-  g.lineTo(THUMB_W * 0.25, THUMB_H * 0.52)
-  g.lineTo(THUMB_W * 0.5, THUMB_H * 0.78)
-  g.lineTo(THUMB_W * 0.78, THUMB_H * 0.6)
-  g.lineTo(THUMB_W, THUMB_H * 0.82)
-  g.lineTo(THUMB_W, THUMB_H)
-  g.lineTo(0, THUMB_H)
-  g.fill()
-  // Dãy nhà phía trước (cửa sổ sáng) – để thấy rõ hiệu ứng gương / chia màn hình
-  const blocks = [[0.05, 0.3], [0.17, 0.42], [0.31, 0.26], [0.86, 0.36]]
-  for (const [x, h] of blocks) {
-    g.fillStyle = '#1b1530'
-    g.fillRect(x * THUMB_W, THUMB_H * (1 - h), THUMB_W * 0.11, THUMB_H * h)
-    g.fillStyle = '#ffd36e'
-    for (let wy = THUMB_H * (1 - h) + 5; wy < THUMB_H - 6; wy += 9) g.fillRect(x * THUMB_W + 4, wy, 4, 4)
-  }
-  sample = c
-  return c
-}
+/**
+ * Thời điểm vẽ ô khi đứng yên (giây tính từ đầu hiệu ứng): hiệu ứng đã "lên hình" rõ nhưng không rơi
+ * đúng lúc chớp trắng / chớp tối (vd. Đèn nháy flash chớp ở 0.0, 0.4, 0.8… → 0.37 nằm giữa 2 lần chớp).
+ */
+const STILL_T = 0.37
 
 const painter = new EffectPainter()
 
@@ -108,11 +73,13 @@ export function EffectsTab(): React.JSX.Element {
 
   return (
     <div className="left-scroll">
-      <label className="search-box">
-        <Icon name="search" size={14} />
-        <input type="search" placeholder={t('effects.search')} value={query} onChange={(e) => setQuery(e.target.value)} />
-      </label>
-      <p className="hint">{t('effects.hint')}</p>
+      <div className="search-row">
+        <label className="search-box">
+          <Icon name="search" size={14} />
+          <input type="search" placeholder={t('effects.search')} value={query} onChange={(e) => setQuery(e.target.value)} />
+        </label>
+        <HelpTip text={t('effects.hint')} />
+      </div>
       {groups.length === 0 && <p className="hint">{t('effects.noMatch')}</p>}
       {groups.map(({ cat, items }) => (
         <section key={cat} className="effect-group">

@@ -2,6 +2,7 @@
 import { createStore, useStore } from 'zustand'
 import type { EncoderId, ExportProgress, ExportResult, ExportSettings } from '@shared/ipc'
 import { canvasSize } from '@shared/project/canvas'
+import { renderEffectFrames } from '../engine/effects/renderEffectFrames'
 import { renderTextFrames } from '../engine/text/renderTextFrames'
 import { pause } from './playbackActions'
 import { projectStore } from './projectStore'
@@ -61,7 +62,9 @@ export async function startExport(settings: ExportSettings): Promise<void> {
   // Vẽ sẵn chữ thành ảnh PNG đúng độ phân giải xuất (cùng hàm vẽ với preview → giống hệt)
   const size = canvasSize(project.settings.aspectRatio, settings.resolution)
   const textFrames = await renderTextFrames(project, size.width, size.height, settings.fps)
-  await window.cutcap.startExport({ project, settings, textFrames })
+  // Lớp phủ vẽ của hiệu ứng (tim bay, lấp lánh…) – cũng vẽ sẵn bằng đúng hàm của preview
+  const effectFrames = await renderEffectFrames(project, size.width, size.height, settings.fps)
+  await window.cutcap.startExport({ project, settings, textFrames: [...textFrames, ...effectFrames] })
 }
 
 export function cancelExport(): void {

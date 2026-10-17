@@ -24,6 +24,11 @@ extraResources:
       - '*.dll'
       - LICENSE.txt
       - ffmpeg-build.json
+  # Mô hình AI khử ồn (RNNoise) cho "Giảm tiếng ồn" → <thư mục cài>/resources/models/
+  - from: resources/models
+    to: models
+    filter:
+      - '*.rnnn'
 extraFiles:
   - LICENSE
   - THIRD_PARTY_NOTICES.md

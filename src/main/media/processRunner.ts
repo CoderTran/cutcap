@@ -7,6 +7,8 @@ export interface RunOptions {
   signal?: AbortSignal
   /** Nhận từng dòng stdout ngay khi có (dùng để đọc tiến trình của ffmpeg). */
   onStdoutLine?: (line: string) => void
+  /** Thư mục làm việc của tiến trình (vd. thư mục mô hình AI để bộ lọc chỉ cần tên file). */
+  cwd?: string
 }
 
 export interface RunResult {
@@ -34,6 +36,7 @@ export function runProcess(exe: string, args: string[], options: RunOptions = {}
 
     const child = spawn(exe, args, {
       windowsHide: true, // không hiện cửa sổ đen (console) trên Windows
+      cwd: options.cwd,
       stdio: ['ignore', 'pipe', 'pipe']
     })
 

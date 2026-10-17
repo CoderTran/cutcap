@@ -69,9 +69,16 @@ export function registerMediaHandlers(): MediaService {
   })
 
   ipcMain.handle(IpcChannels.importMedia, (_event, paths: string[]) => media.importFiles(paths))
+  ipcMain.handle(IpcChannels.measureLoudness, (_event, path: string, startUs: number, durationUs: number) =>
+    media.measureLoudness(path, startUs, durationUs)
+  )
   // File âm thanh trích xuất là dữ liệu của người dùng → để cạnh các dự án, không để trong cache
   ipcMain.handle(IpcChannels.extractAudio, (_event, path: string, mode?: AudioDerive) =>
-    media.extractAudio(path, join(defaultProjectsDir(), strings.extractedAudioFolder), mode === 'karaoke' ? 'karaoke' : 'extract')
+    media.extractAudio(
+      path,
+      join(defaultProjectsDir(), strings.extractedAudioFolder),
+      mode === 'karaoke' || (typeof mode === 'string' && mode.startsWith('fx:')) ? mode : 'extract'
+    )
   )
 
   // Tìm lại file bị mất: hộp thoại mở sẵn ở thư mục cũ (nếu còn), lọc đúng đuôi file cũ

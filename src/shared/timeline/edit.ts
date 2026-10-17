@@ -182,6 +182,9 @@ export function splitClip(draft: Project, clipId: Id, at: Micros, minDuration: M
     right.fadeIn = 0 // hiệu ứng mờ dần vào chỉ giữ ở đầu clip gốc
     right.transitionIn = null
     left.fadeOut = 0 // hiệu ứng mờ dần ra chuyển sang nửa sau
+    // Hiệu ứng động: Vào ở đầu clip gốc (nửa trước), Ra ở cuối (nửa sau), Kết hợp giữ cả hai
+    right.animIn = null
+    left.animOut = null
   }
   if (right.type === 'text') right.animationIn = 'none'
   // Cả 2 nửa giữ mọi keyframe (nửa sau dời theo điểm cắt) → chuyển động liền mạch qua chỗ tách

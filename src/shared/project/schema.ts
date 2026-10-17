@@ -128,6 +128,23 @@ interface ClipBase {
   keyframes: Keyframes
 }
 
+/** Một hiệu ứng động của clip (Vào / Ra / Kết hợp) – xem shared/render/clipAnims.ts. */
+export interface ClipAnim {
+  id: string
+  /** Thời lượng (Kết hợp: thời lượng phần VÀO ở đầu clip). */
+  duration: Micros
+  /** Chỉ dùng cho Kết hợp: thời lượng phần RA ở cuối clip (không có → bằng `duration`). */
+  outDuration?: Micros
+}
+
+/** Thiết lập xử lý âm thanh của clip (xem shared/render/voices.ts). */
+export interface AudioFx {
+  voice: string | null
+  enhance: boolean
+  denoise: boolean
+  original: Id
+}
+
 /** Clip video / ảnh / âm thanh lấy từ một MediaAsset. */
 export interface MediaClip extends ClipBase {
   type: 'media'
@@ -152,6 +169,26 @@ export interface MediaClip extends ClipBase {
    * Trường mới – file dự án cũ không có → null.
    */
   vocalsRemovedFrom: Id | null
+  /** Hiệu ứng động (tab "Hiệu ứng động"); null = không có. Trường mới – file cũ không có → null. */
+  animIn: ClipAnim | null
+  animOut: ClipAnim | null
+  animCombo: ClipAnim | null
+  /**
+   * Xử lý âm thanh (Giảm tiếng ồn, Cải thiện giọng nói, Trình thay đổi giọng nói) + media GỐC trước khi
+   * xử lý (tắt hết / chọn "Bản gốc" là trả lại). null = chưa xử lý. Trường mới – file cũ không có → null.
+   */
+  audioFx: AudioFx | null
+  /**
+   * Clip VIDEO đã xử lý âm thanh: file âm thanh đã xử lý phát THAY cho tiếng gốc của video
+   * (hình vẫn lấy từ assetId, âm thanh vẫn nằm trong clip – không tách ra track riêng).
+   * null = dùng tiếng của chính video. Trường mới – file cũ không có → null.
+   */
+  audioAssetId: Id | null
+  /**
+   * "Chuẩn hóa âm lượng": độ to đã đo (LUFS) + âm lượng trước khi chuẩn hóa (bỏ chọn là trả lại).
+   * null = chưa chuẩn hóa. Trường mới – file cũ không có → null.
+   */
+  loudnorm: { measured: number; prevVolume: number } | null
 }
 
 export const TEXT_ANIMATIONS = ['none', 'fade', 'slide-up', 'zoom', 'typewriter'] as const

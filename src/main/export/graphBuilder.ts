@@ -10,14 +10,15 @@
 //
 // Vị trí/kích thước mỗi lớp hình dùng CHUNG hàm placeLayer với preview → video xuất giống preview.
 // Hàm thuần: chỉ tạo tham số, không chạy gì – test được dễ dàng.
-import type { Clip, MediaAsset, Project, Track } from '@shared/project/schema'
+import type { Clip, MediaAsset, MediaClip, Project, Track } from '@shared/project/schema'
 import { MICROS_PER_SECOND, type Micros } from '@shared/project/time'
 import { clipFfmpegFilters } from '@shared/render/filters'
 import { placeLayer } from '@shared/render/geometry'
 import { clipEnd, projectDuration } from '@shared/timeline/clips'
 import { effectStatements } from './effectFilters'
 import { effectiveFades } from '@shared/timeline/clipProps'
-import { findEffect } from '@shared/render/effects'
+import { clipAnimExprs, hasClipAnim, maxAnimScale } from '@shared/render/clipAnims'
+import { findEffect, hasOverlay } from '@shared/render/effects'
 import { ffmpegValueExpr, hasKeyframes, keyframesOf } from '@shared/timeline/keyframes'
 import { transitionAt, type ActiveTransition } from '@shared/timeline/transitions'
 
@@ -131,7 +132,10 @@ export function animatedLayerFilters(
 ): { size: string[]; place: string[] } {
   const fit = Math.min(W / srcW, H / srcH)
   const scales = keyframesOf(clip, 'scale').map((k) => k.value)
-  const sMax = Math.max(...(scales.length > 0 ? scales : [clip.transform.scale]), 0.05)
+  // Hiệu ứng động (Vào/Ra/Kết hợp) nhân thêm vào Kích thước → ảnh trung gian phải đủ lớn cho lúc to nhất
+  const media = clip.type === 'media' ? clip : null
+  const animMax = media ? maxAnimScale(media) : 1
+  const sMax = Math.max(...(scales.length > 0 ? scales : [clip.transform.scale]), 0.05) * animMax
   let bw = srcW * fit * sMax
   let bh = srcH * fit * sMax
   const shrink = Math.min(1, MAX_ANIMATED_SIDE / Math.max(bw, bh))
@@ -147,36 +151,45 @@ export function animatedLayerFilters(
 
   // perspective: "on" = số thứ tự khung hình (đã chuẩn hóa fps) → giây tính từ đầu clip
   const tp = `(on/${fps}-${sec(extBefore)})`
-  const S = ffmpegValueExpr(clip, 'scale', tp)
-  const X = ffmpegValueExpr(clip, 'x', tp)
-  const Y = ffmpegValueExpr(clip, 'y', tp)
-  const A = `(${ffmpegValueExpr(clip, 'rotation', tp)})*PI/180`
+  // Keyframe + hiệu ứng động cộng dồn – cùng phép tính với preview (transformAt + clipAnimAt)
+  const an = media ? clipAnimExprs(media, tp) : { scale: '1', dx: '0', dy: '0', rot: '0', alpha: '1', sx: '1' }
+  const S = `(${ffmpegValueExpr(clip, 'scale', tp)})*(${an.scale})`
+  const X = `(${ffmpegValueExpr(clip, 'x', tp)})+(${an.dx})`
+  const Y = `(${ffmpegValueExpr(clip, 'y', tp)})+(${an.dy})`
+  const A = `((${ffmpegValueExpr(clip, 'rotation', tp)})+(${an.rot}))*PI/180`
+  const SX = `(${an.sx})`
   const corner = (px: number, py: number): [string, string] => {
     const dx = px - (m + bw / 2)
     const dy = py - (m + bh / 2)
     const k = `${unit.toFixed(8)}*(${S})`
-    return [
-      `${W}*(${X})+${k}*((${dx})*cos(${A})-(${dy})*sin(${A}))`,
-      `${H}*(${Y})+${k}*((${dx})*sin(${A})+(${dy})*cos(${A}))`
-    ]
+    return [`${W}*(${X})+${k}*(${SX}*(${dx})*cos(${A})-(${dy})*sin(${A}))`, `${H}*(${Y})+${k}*(${SX}*(${dx})*sin(${A})+(${dy})*cos(${A}))`]
   }
   const pts = [corner(0, 0), corner(CW, 0), corner(0, CH), corner(CW, CH)]
   const coords = pts.map(([x, y], i) => `x${i}='${x}':y${i}='${y}'`).join(':')
 
   const opacityKf = keyframesOf(clip, 'opacity').length > 0
-  const opacity = opacityKf
-    ? // geq: "T" = giây của khung hình tính từ đầu lớp
-      [`geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*clip(${ffmpegValueExpr(clip, 'opacity', `(T-${sec(extBefore)})`)},0,1)'`]
-    : clip.transform.opacity < 1
-      ? [`colorchannelmixer=aa=${clip.transform.opacity.toFixed(4)}`]
-      : []
+  const animAlpha = media ? clipAnimExprs(media, `(T-${sec(extBefore)})`).alpha : '1'
+  const opacity =
+    opacityKf || animAlpha !== '1'
+      ? // geq: "T" = giây của khung hình tính từ đầu lớp
+        [
+          `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*clip((${ffmpegValueExpr(clip, 'opacity', `(T-${sec(extBefore)})`)})*(${animAlpha}),0,1)'`
+        ]
+      : clip.transform.opacity < 1
+        ? [`colorchannelmixer=aa=${clip.transform.opacity.toFixed(4)}`]
+        : []
   return {
     size: [
       `fps=${fps}`, // khung hình đều → "on" của perspective khớp với thời gian
       `scale=${bw}:${bh}:flags=bicubic`,
       'format=rgba'
     ],
-    place: [...opacity, `pad=${CW}:${CH}:${m}:${m}:color=0x00000000`, `perspective=${coords}:sense=destination:eval=frame`, `crop=${W}:${H}:0:0`]
+    place: [
+      ...opacity,
+      `pad=${CW}:${CH}:${m}:${m}:color=0x00000000`,
+      `perspective=${coords}:sense=destination:eval=frame`,
+      `crop=${W}:${H}:0:0`
+    ]
   }
 }
 
@@ -230,6 +243,12 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
     return info
   }
 
+  /** Đầu vào riêng cho file âm thanh đã xử lý của clip video: đọc đúng đoạn cắt của clip. */
+  const addDubInput = (clip: MediaClip, asset: MediaAsset): InputInfo => {
+    inputArgs.push('-ss', sec(clip.sourceIn), '-t', sec(Math.round(clip.duration * clip.speed)), '-i', asset.path)
+    return { index: inputCount++, sourceOffset: 0, padStart: 0 }
+  }
+
   // ───────── HÌNH ─────────
   filters.push(`color=c=${ffColor(project.settings.backgroundColor)}:s=${W}x${H}:r=${fps}:d=${sec(D)},format=yuv420p[base]`)
   let current = 'base'
@@ -249,7 +268,16 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
         const out = `o${layerIndex}`
         filters.push(`[${current}]split[${uid}keep][${uid}src]`)
         filters.push(`[${uid}src]trim=start=${sec(clip.start)}:end=${sec(clipEnd(clip))}[${uid}cut]`)
-        filters.push(...effectStatements(def, `${uid}cut`, `${uid}fx`, { W, H, fps, start: clip.start, uid }))
+        filters.push(...effectStatements(def, `${uid}cut`, `${uid}fx0`, { W, H, fps, start: clip.start, uid }))
+        // Lớp phủ vẽ (tim bay, lấp lánh…): các khung PNG đã vẽ sẵn, phủ lên sau cùng (giống thứ tự ở preview)
+        const frames = hasOverlay(def) ? opts.textFrames?.get(clip.id) : undefined
+        if (frames?.pattern && frames.count > 0) {
+          inputArgs.push('-framerate', String(fps), '-start_number', '0', '-i', frames.pattern)
+          filters.push(`[${inputCount++}:v]format=rgba,setpts=PTS-STARTPTS+${sec(clip.start)}/TB[${uid}ov]`)
+          filters.push(`[${uid}fx0][${uid}ov]overlay=x=0:y=0:eof_action=pass:repeatlast=0[${uid}fx]`)
+        } else {
+          filters.push(`[${uid}fx0]null[${uid}fx]`)
+        }
         filters.push(
           `[${uid}keep][${uid}fx]overlay=x=0:y=0:eof_action=pass:repeatlast=0:` +
             `enable='between(t,${sec(clip.start)},${sec(clipEnd(clip) - 1)})'[${out}]`
@@ -313,7 +341,7 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
       // Mờ dần / phóng to khi chuyển cảnh: độ mờ tăng 0 → 1 (thời gian cục bộ của lớp, bắt đầu từ 0)
       const fadeIn = tin && (tin.kind === 'fade' || tin.kind === 'zoom') ? [`fade=t=in:st=0:d=${sec(tin.duration)}:alpha=1`] : []
 
-      if (hasKeyframes(clip)) {
+      if (hasKeyframes(clip) || (clip.type === 'media' && hasClipAnim(clip))) {
         // Có keyframe: kích thước/vị trí/xoay/độ mờ tính lại mỗi khung hình (xem animatedLayerFilters)
         const anim = animatedLayerFilters(clip, srcW, srcH, W, H, fps, extBefore)
         const chain = [
@@ -353,7 +381,9 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
         `scale=${w}:${h}:flags=bicubic`,
         'format=rgba',
         ...(clip.type === 'media' ? clipFfmpegFilters(clip) : []),
-        ...(p.rotation !== 0 ? [`rotate=${p.rotation.toFixed(6)}:ow=rotw(${p.rotation.toFixed(6)}):oh=roth(${p.rotation.toFixed(6)}):c=none`] : []),
+        ...(p.rotation !== 0
+          ? [`rotate=${p.rotation.toFixed(6)}:ow=rotw(${p.rotation.toFixed(6)}):oh=roth(${p.rotation.toFixed(6)}):c=none`]
+          : []),
         ...(p.opacity < 1 ? [`colorchannelmixer=aa=${p.opacity.toFixed(4)}`] : []),
         ...fadeIn,
         ...(zoomIn
@@ -389,10 +419,12 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
       const volumeKf = keyframesOf(clip, 'volume')
       // Im lặng suốt clip → bỏ qua (có keyframe âm lượng > 0 thì vẫn phải xử lý)
       if (volumeKf.length > 0 ? volumeKf.every((k) => k.value <= 0) : clip.volume <= 0) continue
-      const asset = project.assets[clip.assetId]
+      // Video đã xử lý âm thanh (giảm ồn, đổi giọng…) → tiếng lấy từ file đã xử lý thay cho tiếng của video
+      const dub = clip.audioAssetId ? project.assets[clip.audioAssetId] : undefined
+      const asset = dub ?? project.assets[clip.assetId]
       if (!asset || asset.kind === 'image' || !asset.hasAudio) continue
 
-      const input = addInput({ clip, track, asset })
+      const input = dub ? addDubInput(clip, dub) : addInput({ clip, track, asset })
       const delayMs = Math.round(clip.start / 1000)
       const { fadeIn, fadeOut } = effectiveFades(clip)
       const chain = [

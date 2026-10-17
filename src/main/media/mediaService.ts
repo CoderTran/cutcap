@@ -8,14 +8,28 @@
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, rename, rm, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative } from 'node:path'
+import { dirname, isAbsolute, join, relative } from 'node:path'
 import type { ExtractAudioResult, ImportMediaResult, MediaPreview } from '@shared/ipc'
-import { derivedFileName, type AudioDerive } from '@shared/media/derived'
+import { derivedFileName, fxKeyOf, type AudioDerive } from '@shared/media/derived'
+import { audioFxChain, DENOISE_MODEL, parseAudioFxKey } from '@shared/render/voices'
 import { fileNameOf, mediaKindFromPath } from '@shared/media/formats'
 import { createId } from '@shared/project/factory'
 import { ProbeError, probeFile, type ProbeInfo } from './probe'
 import { parseProgressLine, runProcess } from './processRunner'
-import { KARAOKE_VERSION, extractAudioArgs, karaokeArgs, proxyArgs, proxyFileName, proxyNeeded, thumbnailArgs, waveformArgs, type ProxyKind } from './transcode'
+import {
+  KARAOKE_VERSION,
+  extractAudioArgs,
+  karaokeArgs,
+  loudnessArgs,
+  parseIntegratedLoudness,
+  voiceArgs,
+  proxyArgs,
+  proxyFileName,
+  proxyNeeded,
+  thumbnailArgs,
+  waveformArgs,
+  type ProxyKind
+} from './transcode'
 import { mediaUrl } from './mediaUrl'
 
 export interface MediaServiceOptions {
@@ -46,6 +60,11 @@ export class MediaService {
   private running: ProxyJob | null = null
 
   constructor(private readonly options: MediaServiceOptions) {}
+
+  /** Thư mục mô hình AI (resources/models), nằm cạnh thư mục ffmpeg cả lúc phát triển lẫn khi đã cài. */
+  get modelsDir(): string {
+    return join(dirname(this.options.ffmpegDir), 'models')
+  }
 
   get ffmpegExe(): string {
     return join(this.options.ffmpegDir, 'ffmpeg.exe')
@@ -115,18 +134,36 @@ export class MediaService {
     if (!this.hasTools()) return { ok: false, error: 'ffmpeg-missing' }
     try {
       const { cacheKey, info } = await this.probeCached(path)
-      // Trích xuất: chỉ từ video. Xóa giọng: từ video hoặc file âm thanh, phải là stereo.
+      // Trích xuất: chỉ từ video. Xóa giọng: từ video hoặc file âm thanh, phải là stereo. Xử lý âm thanh: video/âm thanh.
       if (!info.hasAudio || (mode === 'extract' && info.kind !== 'video')) return { ok: false, error: 'no-audio' }
       if (mode === 'karaoke' && (info.audioChannels ?? 0) < 2) return { ok: false, error: 'mono' }
+      const fxKey = fxKeyOf(mode)
+      const fx = fxKey !== null ? parseAudioFxKey(fxKey) : null
+      const af = fx ? audioFxChain(fx) : null
+      if (fxKey !== null && !af) return { ok: false, error: 'failed', detail: `Thiết lập xử lý âm thanh không hợp lệ: ${fxKey}` }
+      if (fx?.denoise && !existsSync(join(this.modelsDir, DENOISE_MODEL))) {
+        return { ok: false, error: 'failed', detail: `Thiếu mô hình khử ồn: ${join(this.modelsDir, DENOISE_MODEL)}` }
+      }
       // Bản xóa giọng: băm thêm phiên bản bộ lọc → đổi bộ lọc thì tạo file mới, không dùng lại bản cũ
-      const hash = mode === 'karaoke' ? createHash('sha1').update(`${cacheKey}|karaoke-v${KARAOKE_VERSION}`).digest('hex') : cacheKey
+      // Xử lý âm thanh: băm thêm chuỗi bộ lọc → sửa công thức thì tạo file mới
+      const hash =
+        mode === 'karaoke'
+          ? createHash('sha1').update(`${cacheKey}|karaoke-v${KARAOKE_VERSION}`).digest('hex')
+          : af
+            ? createHash('sha1').update(`${cacheKey}|${af}`).digest('hex')
+            : cacheKey
       const dest = join(destDir, derivedFileName(fileNameOf(path), mode, hash))
       if (existsSync(dest)) return { ok: true, path: dest }
       await mkdir(destDir, { recursive: true })
       const partial = `${dest}.part`
       try {
-        const args = mode === 'karaoke' ? karaokeArgs(path, partial) : extractAudioArgs(path, partial, info.audioCodec)
-        await runProcess(this.ffmpegExe, args)
+        const args = af
+          ? voiceArgs(path, partial, af)
+          : mode === 'karaoke'
+            ? karaokeArgs(path, partial)
+            : extractAudioArgs(path, partial, info.audioCodec)
+        // Chạy trong thư mục mô hình: bộ lọc khử ồn chỉ cần tên file mô hình (đường dẫn file vào/ra là tuyệt đối)
+        await runProcess(this.ffmpegExe, args, { cwd: af ? this.modelsDir : undefined })
         await rename(partial, dest)
       } finally {
         await rm(partial, { force: true })
@@ -134,6 +171,22 @@ export class MediaService {
       return { ok: true, path: dest }
     } catch (err) {
       return { ok: false, error: 'failed', detail: (err as Error).message }
+    }
+  }
+
+  // ───────── Đo độ to (Chuẩn hóa âm lượng) ─────────
+
+  /**
+   * Độ to tích hợp (LUFS, chuẩn EBU R128) của đoạn file mà clip đang dùng.
+   * @returns null nếu không có tiếng / im lặng / lỗi
+   */
+  async measureLoudness(path: string, startUs: number, durationUs: number): Promise<number | null> {
+    if (!existsSync(path) || !this.hasTools()) return null
+    try {
+      const { stderr } = await runProcess(this.ffmpegExe, loudnessArgs(path, startUs / 1e6, Math.max(0.1, durationUs / 1e6)))
+      return parseIntegratedLoudness(stderr)
+    } catch {
+      return null
     }
   }
 

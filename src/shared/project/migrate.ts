@@ -14,7 +14,9 @@ import {
   TEXT_ANIMATIONS,
   TRACK_KINDS,
   TRANSITION_KINDS,
+  type AudioFx,
   type Clip,
+  type ClipAnim,
   type Keyframes,
   type MediaAsset,
   type Project,
@@ -115,6 +117,30 @@ function parseTransform(v: unknown): Clip['transform'] {
   }
 }
 
+/**
+ * Xử lý âm thanh. Đọc cả dạng cũ "voice: { id, original }" (bản thử nghiệm trước khi gộp Giảm tiếng ồn /
+ * Cải thiện giọng nói) để dự án đã lưu lúc đó vẫn mở đúng.
+ */
+function parseAudioFx(v: RawObject): AudioFx | null {
+  const fx = isObj(v.audioFx) ? v.audioFx : null
+  if (fx && typeof fx.original === 'string' && fx.original) {
+    return { voice: typeof fx.voice === 'string' && fx.voice ? fx.voice : null, enhance: fx.enhance === true, denoise: fx.denoise === true, original: fx.original }
+  }
+  const old = isObj(v.voice) ? v.voice : null
+  if (old && typeof old.id === 'string' && typeof old.original === 'string' && old.original) {
+    return { voice: old.id, enhance: false, denoise: false, original: old.original }
+  }
+  return null
+}
+
+/** Hiệu ứng động: hỏng / thiếu → null (không có hiệu ứng). Mã lạ vẫn giữ – lúc vẽ sẽ bỏ qua. */
+function parseAnim(v: unknown): ClipAnim | null {
+  if (!isObj(v) || typeof v.id !== 'string' || !v.id) return null
+  const anim: ClipAnim = { id: v.id, duration: Math.max(100_000, micros(v.duration, 500_000)) }
+  if (v.outDuration !== undefined) anim.outDuration = Math.max(100_000, micros(v.outDuration, anim.duration))
+  return anim
+}
+
 /** Keyframe: bỏ qua thuộc tính lạ / giá trị hỏng thay vì báo file hỏng; luôn sắp xếp lại theo thời gian. */
 function parseKeyframes(v: unknown): Keyframes {
   const out: Keyframes = {}
@@ -168,7 +194,18 @@ function parseClip(v: unknown, where: string): Clip {
           ? { kind: oneOf(tr.kind, TRANSITION_KINDS, 'fade'), duration: micros(tr.duration, 500_000) }
           : null,
         // Trường mới (Xóa giọng hát): file cũ không có → null
-        vocalsRemovedFrom: typeof v.vocalsRemovedFrom === 'string' && v.vocalsRemovedFrom ? v.vocalsRemovedFrom : null
+        vocalsRemovedFrom: typeof v.vocalsRemovedFrom === 'string' && v.vocalsRemovedFrom ? v.vocalsRemovedFrom : null,
+        // Trường mới (Hiệu ứng động): file cũ không có → null
+        animIn: parseAnim(v.animIn),
+        animOut: parseAnim(v.animOut),
+        animCombo: parseAnim(v.animCombo),
+        // Trường mới (Xử lý âm thanh): file cũ không có / hỏng → chưa xử lý
+        audioFx: parseAudioFx(v),
+        audioAssetId: typeof v.audioAssetId === 'string' && v.audioAssetId ? v.audioAssetId : null,
+        loudnorm:
+          isObj(v.loudnorm) && Number.isFinite(v.loudnorm.measured) && Number.isFinite(v.loudnorm.prevVolume)
+            ? { measured: v.loudnorm.measured as number, prevVolume: num(v.loudnorm.prevVolume, 1, 0, 2) }
+            : null
       }
     }
     case 'effect':

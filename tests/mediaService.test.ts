@@ -145,6 +145,61 @@ describe.skipIf(!hasFfmpeg)('MediaService với ffmpeg thật', () => {
     expect(await service.extractAudio(files.wav, out, 'karaoke')).toEqual({ ok: false, error: 'mono' })
   })
 
+  it('đổi giọng: "Sóc chuột" nâng cao độ 1 quãng tám (220 Hz → 440 Hz), giữ độ dài; giọng lạ báo lỗi', async () => {
+    const out = join(dir, 'Âm thanh trích xuất')
+    const r = await service.extractAudio(files.wav, out, 'fx:d0e0vchipmunk')
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.path).toMatch(/Nhạc nền \(xử lý [0-9a-f]{6}\)\.m4a$/)
+    const band = async (f: number): Promise<number> => {
+      const { stderr } = await runProcess(ffmpeg, ['-hide_banner', '-i', r.path, '-af', `bandpass=f=${f}:width_type=h:w=40,volumedetect`, '-f', 'null', '-'])
+      return Number(/mean_volume: (-?[\d.]+) dB/.exec(stderr)?.[1])
+    }
+    expect((await band(440)) - (await band(220))).toBeGreaterThan(15)
+    const [probe] = await service.importFiles([r.path])
+    expect(probe.ok && Math.abs(probe.asset.durationUs - 1_500_000)).toBeLessThan(150_000) // tốc độ nói giữ nguyên
+    expect(await service.extractAudio(files.wav, out, 'fx:d0e0vkhongco')).toMatchObject({ ok: false, error: 'failed' })
+    expect(await service.extractAudio(files.wav, out, 'fx:linh-tinh')).toMatchObject({ ok: false, error: 'failed' })
+    // Giảm ồn + rõ giọng (không đổi giọng) cũng chạy được
+    expect((await service.extractAudio(files.wav, out, 'fx:d1e1v')).ok).toBe(true)
+  })
+
+  it('giảm tiếng ồn (AI RNNoise): ồn nền giảm > 20 dB, giữ đúng độ dài, không tụt tiếng giữa chừng', async () => {
+    const q = ['-hide_banner', '-loglevel', 'error', '-y']
+    const out = join(dir, 'Âm thanh trích xuất')
+    // Ồn hồng + ồn nâu (giống tiếng ù / đường phố) suốt 8 giây, stereo
+    const noisy = join(dir, 'có ồn.wav')
+    await runProcess(ffmpeg, [
+      ...q, '-filter_complex', 'anoisesrc=c=pink:a=0.08:d=8:r=48000[n];anoisesrc=c=brown:a=0.1:d=8:r=48000[b];[n][b]amix=inputs=2:normalize=0',
+      '-ac', '2', noisy
+    ])
+    const r = await service.extractAudio(noisy, out, 'fx:d1e0v')
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    const rmsDb = async (file: string, start: number, length: number): Promise<number> => {
+      const { stderr } = await runProcess(ffmpeg, ['-hide_banner', '-ss', String(start), '-t', String(length), '-i', file, '-af', 'astats=measure_perchannel=0', '-f', 'null', '-'])
+      return Number(/RMS level dB: (-?[\d.]+|-inf)/.exec(stderr)?.[1].replace('-inf', '-200'))
+    }
+    expect((await rmsDb(noisy, 1, 6)) - (await rmsDb(r.path, 1, 6))).toBeGreaterThan(20)
+    const [probe] = await service.importFiles([r.path])
+    expect(probe.ok && Math.abs(probe.asset.durationUs - 8_000_000)).toBeLessThan(150_000)
+  })
+
+  it('đo độ to (Chuẩn hóa âm lượng): to gấp đôi → +6 dB; đo đúng đoạn; im lặng → null', async () => {
+    const q = ['-hide_banner', '-loglevel', 'error', '-y']
+    const loud = join(dir, 'to.wav')
+    const quiet = join(dir, 'nhỏ.wav')
+    const silent = join(dir, 'im.wav')
+    await runProcess(ffmpeg, [...q, '-f', 'lavfi', '-i', 'sine=frequency=440:duration=4,volume=0.5', loud])
+    await runProcess(ffmpeg, [...q, '-f', 'lavfi', '-i', 'sine=frequency=440:duration=4,volume=0.25', quiet])
+    await runProcess(ffmpeg, [...q, '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=mono', '-t', '2', silent])
+    const a = (await service.measureLoudness(loud, 0, 4_000_000))!
+    const b = (await service.measureLoudness(quiet, 1_000_000, 2_000_000))!
+    expect(a - b).toBeGreaterThan(5.5)
+    expect(a - b).toBeLessThan(6.5)
+    expect(await service.measureLoudness(silent, 0, 2_000_000)).toBeNull()
+  })
+
   it('chỉ cho đọc file media hoặc file trong cache', () => {
     expect(service.isAllowedPath(files.mp4)).toBe(true)
     expect(service.isAllowedPath(join(dir, 'cache', 'abc', 'thumb.jpg'))).toBe(true)

@@ -16,6 +16,12 @@ xem file `LICENSE`. Cutcap có sử dụng các phần mềm sau:
 Theo GPL, nếu bạn phân phối lại Cutcap, bạn phải cung cấp (hoặc chỉ rõ nơi lấy) mã nguồn tương ứng
 của Cutcap và của FFmpeg.
 
+## Mô hình khử ồn RNNoise (đóng gói kèm bộ cài)
+
+- File `resources/models/rnnoise-mp.rnnn` – mô hình "marathon-prescription" từ
+  https://github.com/GregorR/rnnoise-models, chạy bằng bộ lọc `arnndn` của FFmpeg
+- Theo README của kho gốc, các file mô hình không thuộc diện bản quyền. Chi tiết: `resources/models/README.md`
+
 ## Electron & Chromium
 
 - Electron – giấy phép MIT – https://github.com/electron/electron

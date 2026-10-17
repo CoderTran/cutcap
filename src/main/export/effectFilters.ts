@@ -8,6 +8,8 @@ import {
   barPx,
   blurPx,
   coverCrop,
+  framedLayout,
+  gridBorderPx,
   pixelGrid,
   scanlineSpacing,
   shiftPx,
@@ -101,6 +103,7 @@ function opStatements(
     case 'transform': {
       // Biến đổi quanh tâm khung; phần trống (thu nhỏ/xoay/dời) là màu đen như preview
       const S = `(${ffmpegExpr(op.scale, local.on)})`
+      const SX = `(${ffmpegExpr(op.sx ?? '1', local.on)})`
       const DX = `(${ffmpegExpr(op.dx, local.on)})`
       const DY = `(${ffmpegExpr(op.dy, local.on)})`
       const A = `((${ffmpegExpr(op.rotate, local.on)})*PI/180)`
@@ -110,8 +113,8 @@ function opStatements(
         const dx = px - (MARGIN + W / 2)
         const dy = py - (MARGIN + H / 2)
         return [
-          `${W / 2}+${W}*${DX}+${S}*((${dx})*cos(${A})-(${dy})*sin(${A}))`,
-          `${H / 2}+${H}*${DY}+${S}*((${dx})*sin(${A})+(${dy})*cos(${A}))`
+          `${W / 2}+${W}*${DX}+${S}*(${SX}*(${dx})*cos(${A})-(${dy})*sin(${A}))`,
+          `${H / 2}+${H}*${DY}+${S}*(${SX}*(${dx})*sin(${A})+(${dy})*cos(${A}))`
         ]
       }
       const coords = [corner(0, 0), corner(CW, 0), corner(0, CH), corner(CW, CH)]
@@ -142,12 +145,43 @@ function opStatements(
     }
 
     case 'bars': {
-      const h = barPx(op.size, H)
-      return chain(inL, outL, [
-        `drawbox=x=0:y=0:w=iw:h=${h}:c=black:t=fill`,
-        `drawbox=x=0:y=${H - h}:w=iw:h=${h}:c=black:t=fill`
-      ])
+      if (!/\bt\b/.test(op.size)) {
+        // Cố định → drawbox (nhanh). Lưu ý: trong drawbox "t" là độ dày nét, KHÔNG phải thời gian
+        const h = barPx(Number(op.size), H)
+        return chain(inL, outL, [
+          `drawbox=x=0:y=0:w=iw:h=${h}:c=black:t=fill`,
+          `drawbox=x=0:y=${H - h}:w=iw:h=${h}:c=black:t=fill`
+        ])
+      }
+      // Thay đổi theo thời gian (màn trập) → geq: tô đen các hàng trong 2 dải
+      const hh = `round(${H}*clip(${ffmpegExpr(op.size, local.T)},0,0.5))`
+      const f = `(1-gt(lt(Y,${hh})+gte(Y,${H}-${hh}),0))`
+      return chain(inL, outL, [`geq=r='r(X,Y)*${f}':g='g(X,Y)*${f}':b='b(X,Y)*${f}'`])
     }
+
+    case 'wave': {
+      // Lấy mẫu từ vị trí dời: hàng Y lấy điểm (X − dx(Y)) → nội dung dời sang phải dx – giống canvas vẽ dải dời +dx
+      const phase = (coord: string, size: number): string => `sin(2*PI*(${n(op.cycles)}*${coord}/${size}+${n(op.speed)}*${local.T}))`
+      const sample =
+        op.axis === 'h'
+          ? (c: string): string => `${c}(X-${n(op.amp * W)}*${phase('Y', H)},Y)`
+          : (c: string): string => `${c}(X,Y-${n(op.amp * H)}*${phase('X', W)})`
+      return chain(inL, outL, [`geq=r='${sample('r')}':g='${sample('g')}':b='${sample('b')}'`])
+    }
+
+    case 'framed': {
+      const L = framedLayout(W, H, op.scale, op.border)
+      return [
+        `[${inL}]split[${p}bg][${p}fg]`,
+        `[${p}bg]gblur=sigma=${n(blurPx(op.blur, H))}[${p}bb]`,
+        `[${p}fg]scale=${L.fw}:${L.fh}:flags=bicubic,pad=${L.fw + 2 * L.b}:${L.fh + 2 * L.b}:${L.b}:${L.b}:color=white[${p}card]`,
+        `[${p}bb][${p}card]overlay=x=${L.x}:y=${L.y}[${outL}]`
+      ]
+    }
+
+    case 'overlay':
+      // Lớp phủ vẽ: graphBuilder phủ các khung PNG đã vẽ sẵn lên sau cùng – ở đây không làm gì
+      return chain(inL, outL, [])
 
     case 'mirror': {
       if (op.mode === 'h') {
@@ -181,8 +215,14 @@ function opStatements(
       for (let r = 0; r < op.rows; r++) {
         for (let c = 0; c < op.cols; c++) {
           const i = r * op.cols + c
-          const crop = coverCrop(W, H, ws[c], hs[r])
-          lines.push(`[${p}s${i}]crop=${crop.w}:${crop.h}:${crop.x}:${crop.y},scale=${ws[c]}:${hs[r]}:flags=bicubic,setsar=1[${p}c${i}]`)
+          // Ô có viền: ảnh nhỏ hơn ô 2 lần viền, đệm màu viền xung quanh; flipAlt: ô xen kẽ lật gương
+          const b = gridBorderPx(op.border, H)
+          const iw = Math.max(2, ws[c] - 2 * b)
+          const ih = Math.max(2, hs[r] - 2 * b)
+          const crop = coverCrop(W, H, iw, ih)
+          const flip = op.flipAlt && (r + c) % 2 === 1 ? ',hflip' : ''
+          const pad = b > 0 ? `,pad=${ws[c]}:${hs[r]}:${b}:${b}:color=${op.borderColor ?? 'white'}` : ''
+          lines.push(`[${p}s${i}]crop=${crop.w}:${crop.h}:${crop.x}:${crop.y},scale=${iw}:${ih}:flags=bicubic${flip}${pad},setsar=1[${p}c${i}]`)
         }
         const cells = Array.from({ length: op.cols }, (_, c) => `[${p}c${r * op.cols + c}]`).join('')
         lines.push(op.cols > 1 ? `${cells}hstack=inputs=${op.cols}[${p}r${r}]` : `${cells}null[${p}r${r}]`)

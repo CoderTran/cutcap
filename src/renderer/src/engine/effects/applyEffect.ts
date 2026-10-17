@@ -8,6 +8,8 @@ import {
   barPx,
   blurPx,
   coverCrop,
+  framedLayout,
+  gridBorderPx,
   pixelGrid,
   scanlineSpacing,
   shiftPx,
@@ -16,6 +18,7 @@ import {
   type EffectOp
 } from '@shared/render/effects'
 import { evalExpr } from '@shared/render/expr'
+import { drawOverlay } from './overlays'
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 
@@ -25,6 +28,7 @@ export class EffectPainter {
   private readonly snap = new OffscreenCanvas(1, 1)
   private readonly tmp = new OffscreenCanvas(1, 1)
   private readonly noise = new OffscreenCanvas(128, 128)
+  private readonly layer = new OffscreenCanvas(1, 1)
 
   /** Áp hiệu ứng lên toàn bộ nội dung đang có trên ctx (khung W×H). @param t giây tính từ đầu clip hiệu ứng */
   apply(ctx: Ctx, def: EffectDef, W: number, H: number, t: number): void {
@@ -89,7 +93,7 @@ export class EffectPainter {
         ctx.fillRect(0, 0, W, H)
         ctx.translate(W / 2 + evalExpr(op.dx, t) * W, H / 2 + evalExpr(op.dy, t) * H)
         ctx.rotate((evalExpr(op.rotate, t) * Math.PI) / 180)
-        ctx.scale(s, s)
+        ctx.scale(s * evalExpr(op.sx ?? '1', t), s)
         ctx.drawImage(snap, -W / 2, -H / 2)
         return
       }
@@ -108,7 +112,7 @@ export class EffectPainter {
         return
       }
       case 'bars': {
-        const h = barPx(op.size, H)
+        const h = barPx(Math.min(0.5, Math.max(0, evalExpr(op.size, t))), H)
         ctx.fillStyle = '#000'
         ctx.fillRect(0, 0, W, h)
         ctx.fillRect(0, H - h, W, h)
@@ -137,16 +141,66 @@ export class EffectPainter {
       case 'grid': {
         const ws = splitSizes(W, op.cols)
         const hs = splitSizes(H, op.rows)
+        const b = gridBorderPx(op.border, H)
         let y = 0
         for (let r = 0; r < op.rows; r++) {
           let x = 0
           for (let c = 0; c < op.cols; c++) {
-            const crop = coverCrop(W, H, ws[c], hs[r])
-            ctx.drawImage(snap, crop.x, crop.y, crop.w, crop.h, x, y, ws[c], hs[r])
+            const iw = Math.max(2, ws[c] - 2 * b)
+            const ih = Math.max(2, hs[r] - 2 * b)
+            if (b > 0) {
+              ctx.fillStyle = op.borderColor === 'black' ? '#000' : '#fff'
+              ctx.fillRect(x, y, ws[c], hs[r])
+            }
+            const crop = coverCrop(W, H, iw, ih)
+            const flip = op.flipAlt && (r + c) % 2 === 1
+            ctx.setTransform(flip ? -1 : 1, 0, 0, 1, flip ? x + b + iw : 0, 0)
+            ctx.drawImage(snap, crop.x, crop.y, crop.w, crop.h, flip ? 0 : x + b, y + b, iw, ih)
+            ctx.setTransform(1, 0, 0, 1, 0, 0)
             x += ws[c]
           }
           y += hs[r]
         }
+        return
+      }
+      case 'wave': {
+        // Vẽ lại từng dải 2 điểm ảnh, mỗi dải dời theo hình sin (bản xuất dùng geq cùng công thức)
+        const STRIP = 2
+        const shift = (coord: number, size: number): number => Math.sin(2 * Math.PI * ((op.cycles * coord) / size + op.speed * t))
+        if (op.axis === 'h') {
+          for (let y = 0; y < H; y += STRIP) {
+            const dx = op.amp * W * shift(y + STRIP / 2, H)
+            ctx.drawImage(snap, 0, y, W, STRIP, dx, y, W, STRIP)
+          }
+        } else {
+          for (let x = 0; x < W; x += STRIP) {
+            const dy = op.amp * H * shift(x + STRIP / 2, W)
+            ctx.drawImage(snap, x, 0, STRIP, H, x, dy, STRIP, H)
+          }
+        }
+        return
+      }
+      case 'framed': {
+        const L = framedLayout(W, H, op.scale, op.border)
+        ctx.filter = `blur(${blurPx(op.blur, H)}px)`
+        ctx.drawImage(snap, 0, 0)
+        ctx.filter = 'none'
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(L.x, L.y, L.fw + 2 * L.b, L.fh + 2 * L.b)
+        ctx.drawImage(snap, L.x + L.b, L.y + L.b, L.fw, L.fh)
+        return
+      }
+      case 'overlay': {
+        // Vẽ lên lớp trong suốt riêng rồi phủ lên – đúng như khi xuất (PNG trong suốt + overlay)
+        if (this.layer.width !== W || this.layer.height !== H) {
+          this.layer.width = W
+          this.layer.height = H
+        }
+        const lc = this.layer.getContext('2d')!
+        lc.setTransform(1, 0, 0, 1, 0, 0)
+        lc.clearRect(0, 0, W, H)
+        drawOverlay(lc, op.kind, W, H, t)
+        ctx.drawImage(this.layer, 0, 0)
         return
       }
       case 'flip':

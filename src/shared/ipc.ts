@@ -14,6 +14,7 @@ export const IpcChannels = {
   pickMediaFiles: 'media:pick-files',
   importMedia: 'media:import',
   extractAudio: 'media:extract-audio',
+  measureLoudness: 'media:measure-loudness',
   prepareMedia: 'media:prepare',
   mediaUpdated: 'media:updated',
   exportDetectEncoders: 'export:detect-encoders',
@@ -219,6 +220,8 @@ export interface CutcapApi {
    * mode = 'karaoke': tạo bản đã xóa giọng hát (từ video hoặc file âm thanh stereo).
    */
   extractAudio(path: string, mode?: AudioDerive): Promise<ExtractAudioResult>
+  /** Độ to (LUFS) của đoạn file [startUs, startUs + durationUs) – cho "Chuẩn hóa âm lượng". null = không đo được. */
+  measureLoudness(path: string, startUs: number, durationUs: number): Promise<number | null>
   /** Chuẩn bị thumbnail + bản phát (tạo proxy chạy nền nếu cần). */
   prepareMedia(path: string): Promise<MediaPreview>
   /** Nhận cập nhật khi proxy tiến triển / xong / lỗi. Trả về hàm hủy đăng ký. */

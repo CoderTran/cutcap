@@ -10,6 +10,7 @@ import { useEditorStore } from '../../state/editorStore'
 import { editTimeFor } from '../../state/keyframeActions'
 import { useProjectStore } from '../../state/projectStore'
 import { setTransform } from '../../state/textActions'
+import { HelpTip } from '../HelpTip'
 import { KeyframeButton } from './KeyframeButton'
 import { SliderField } from './SliderField'
 
@@ -24,7 +25,10 @@ export function TransformSection({ clip, disabled }: { clip: Clip; disabled: boo
 
   return (
     <section className="inspector-section">
-      <h4>{t('transform.title')}</h4>
+      <h4 className="with-help">
+        {t('transform.title')}
+        <HelpTip text={t('transform.dragHint')} />
+      </h4>
       <SliderField
         label={t('transform.scale')}
         display={`${Math.round(tf.scale * 100)}%`}
@@ -85,7 +89,6 @@ export function TransformSection({ clip, disabled }: { clip: Clip; disabled: boo
         onReset={() => setTransform(clip.id, { opacity: 1 })}
         extra={<KeyframeButton clip={clip} props={['opacity']} disabled={disabled} />}
       />
-      <p className="hint">{t('transform.dragHint')}</p>
     </section>
   )
 }

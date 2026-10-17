@@ -3,7 +3,19 @@ import { createEmptyProject } from '@shared/project/factory'
 import * as ops from '@shared/project/ops'
 import type { MediaAsset, MediaClip, Project } from '@shared/project/schema'
 import { createMediaClip, findClip } from '@shared/timeline/clips'
-import { applyVocalRemoval, canDetachAudio, canRemoveVocals, canRestoreVocals, detachAudio, restoreVocals } from '@shared/timeline/detach'
+import {
+  applyVocalRemoval,
+  applyAudioFx,
+  audioFxSourceAssetId,
+  canProcessAudio,
+  clearAudioFx,
+  canDetachAudio,
+  canRemoveVocals,
+  canRestoreVocals,
+  detachAudio,
+  processedAudioAssetIds,
+  restoreVocals,
+} from '@shared/timeline/detach'
 
 const S = 1_000_000
 
@@ -84,6 +96,68 @@ describe('tách âm thanh', () => {
     expect(findClip(project, clip.id)!.clip).toMatchObject({ volume: 0 })
     expect(restoreVocals(project, newId)).toBe(true)
     expect(findClip(project, newId)!.clip).toMatchObject({ assetId: plain.id }) // tiếng gốc của video, vẫn ở track âm thanh
+  })
+
+  it('xử lý âm thanh: đổi giọng / giảm ồn / rõ giọng luôn tính từ bản gốc; tắt hết trả lại; file cũ rời thư viện', () => {
+    const { project, clip } = setup()
+    const music = asset('nhac.mp3', 'audio')
+    ops.addAssets(project, [music])
+    const m: MediaClip = { ...createMediaClip(music, 0), volume: 0.7 }
+    ops.addClip(project, ops.addTrack(project, 'audio'), m)
+    const robot = asset('nhac (giọng robot).m4a', 'audio')
+    const robotDenoise = asset('nhac (giọng robot · giảm ồn).m4a', 'audio')
+
+    expect(canProcessAudio(project, m.id)).toBe(true)
+    expect(applyAudioFx(project, m.id, { voice: 'robot', enhance: false, denoise: false }, robot)).toBe(true)
+    expect(findClip(project, m.id)!.clip).toMatchObject({ assetId: robot.id, audioFx: { voice: 'robot', original: music.id }, volume: 0.7 })
+    expect(audioFxSourceAssetId(project, m.id)).toBe(music.id) // lần sau xử lý từ bản gốc, không chồng hiệu ứng
+    applyAudioFx(project, m.id, { voice: 'robot', enhance: false, denoise: true }, robotDenoise)
+    expect(findClip(project, m.id)!.clip).toMatchObject({ assetId: robotDenoise.id, audioFx: { voice: 'robot', denoise: true, original: music.id } })
+    expect(ops.isAssetUsed(project, music.id)).toBe(true)
+    expect(project.assets[robot.id]).toBeUndefined() // file cũ không còn dùng → rời thư viện
+    expect(clearAudioFx(project, m.id)).toBe(true)
+    expect(findClip(project, m.id)!.clip).toMatchObject({ assetId: music.id, audioFx: null })
+    expect(project.assets[robotDenoise.id]).toBeUndefined()
+    expect(project.assets[music.id]).toBeDefined()
+
+    // Clip video: KHÔNG tách âm thanh – clip giữ nguyên hình, phát file đã xử lý thay tiếng gốc
+    const tracksBefore = project.tracks.length
+    const enhanced = asset('video (rõ giọng).m4a', 'audio')
+    const denoised = asset('video (rõ giọng · giảm ồn).m4a', 'audio')
+    expect(applyAudioFx(project, clip.id, { voice: null, enhance: true, denoise: false }, enhanced)).toBe(true)
+    expect(findClip(project, clip.id)!.clip).toMatchObject({
+      assetId: 'video.mp4',
+      audioAssetId: enhanced.id,
+      audioFx: { enhance: true, original: 'video.mp4' },
+      volume: 0.8
+    })
+    expect(project.tracks.length).toBe(tracksBefore)
+    expect(audioFxSourceAssetId(project, clip.id)).toBe('video.mp4')
+    applyAudioFx(project, clip.id, { voice: null, enhance: true, denoise: true }, denoised)
+    expect(findClip(project, clip.id)!.clip).toMatchObject({ audioAssetId: denoised.id })
+    expect(project.assets[enhanced.id]).toBeUndefined()
+
+    // Tách âm thanh sau đó: clip âm thanh mang theo bản đã xử lý, bản gốc = tiếng trích xuất
+    const plain = asset('video (âm thanh).m4a', 'audio')
+    const audioId = detachAudio(project, clip.id, plain)!
+    expect(findClip(project, audioId)!.clip).toMatchObject({ assetId: denoised.id, audioFx: { enhance: true, denoise: true, original: plain.id } })
+    expect(findClip(project, clip.id)!.clip).toMatchObject({ volume: 0, audioAssetId: null, audioFx: null })
+    expect(clearAudioFx(project, audioId)).toBe(true)
+    expect(findClip(project, audioId)!.clip).toMatchObject({ assetId: plain.id, audioFx: null })
+    expect(project.assets[denoised.id]).toBeUndefined()
+  })
+
+  it('xử lý âm thanh video rồi tắt hết: clip video trả về tiếng gốc, file đã xử lý rời thư viện', () => {
+    const { project, clip } = setup()
+    const fx = asset('video (giảm ồn).m4a', 'audio')
+    applyAudioFx(project, clip.id, { voice: null, enhance: false, denoise: true }, fx)
+    expect(ops.isAssetUsed(project, fx.id)).toBe(true)
+    // File đã xử lý là bản phụ của clip → không hiện trong thư viện; video gốc vẫn hiện
+    expect([...processedAudioAssetIds(project.tracks)]).toEqual([fx.id])
+    expect(clearAudioFx(project, clip.id)).toBe(true)
+    expect(processedAudioAssetIds(project.tracks).size).toBe(0)
+    expect(findClip(project, clip.id)!.clip).toMatchObject({ assetId: 'video.mp4', audioAssetId: null, audioFx: null })
+    expect(project.assets[fx.id]).toBeUndefined()
   })
 
   it('không tách: ảnh, video không tiếng, track khóa', () => {

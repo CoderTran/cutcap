@@ -156,19 +156,19 @@ export class Exporter {
   }
 }
 
-/** Ghi ảnh PNG của các clip chữ ra ổ đĩa, trả về đường dẫn theo id clip. */
+/** Ghi ảnh PNG của các clip chữ và lớp phủ hiệu ứng ra ổ đĩa, trả về đường dẫn theo id clip. */
 async function writeTextFrames(workDir: string, sets: TextFrameSet[]): Promise<Map<string, TextFramesOnDisk>> {
   const result = new Map<string, TextFramesOnDisk>()
   for (const [i, set] of sets.entries()) {
     const dir = join(workDir, `text-${i}`)
     await mkdir(dir, { recursive: true })
     for (const [n, png] of set.animated.entries()) {
-      await writeFile(join(dir, `f_${String(n).padStart(4, '0')}.png`), png)
+      await writeFile(join(dir, `f_${String(n).padStart(6, '0')}.png`), png)
     }
     const still = join(dir, 'still.png')
     await writeFile(still, set.still)
     result.set(set.clipId, {
-      pattern: set.animated.length > 0 ? join(dir, 'f_%04d.png') : null,
+      pattern: set.animated.length > 0 ? join(dir, 'f_%06d.png') : null,
       count: set.animated.length,
       still
     })

@@ -3,7 +3,8 @@
 // làm việc với file, FFmpeg, lưu dự án… – những thứ giao diện không được làm trực tiếp.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { strings } from './strings'
 import { IpcChannels, type AppInfo } from '@shared/ipc'
 import { registerExportHandlers } from './ipc/exportHandlers'
 import { registerMediaHandlers } from './ipc/mediaHandlers'
@@ -54,9 +55,33 @@ function createMainWindow(): BrowserWindow {
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (!app.isPackaged && devUrl) {
     void win.loadURL(devUrl)
+    // Chỉ khi phát triển: F12 mở/đóng DevTools để xem lỗi (bản cài đặt không có)
+    win.webContents.on('before-input-event', (_e, input) => {
+      if (input.type === 'keyDown' && input.key === 'F12') win.webContents.toggleDevTools()
+    })
   } else {
     void win.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  // Tiến trình vẽ giao diện bị sập (vd. lỗi trình điều khiển card đồ họa) → cửa sổ sẽ trống trơn.
+  // Báo cho người dùng biết lý do rồi tải lại; dự án vẫn còn trong bản tự động lưu.
+  win.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[Cutcap] Giao diện bị dừng:', details)
+    if (details.reason === 'clean-exit' || win.isDestroyed()) return
+    void dialog
+      .showMessageBox(win, {
+        type: 'error',
+        title: 'Cutcap',
+        message: strings.rendererCrashed,
+        detail: `${strings.rendererCrashedDetail}
+
+(${details.reason}, mã ${details.exitCode})`,
+        buttons: [strings.reload]
+      })
+      .then(() => {
+        if (!win.isDestroyed()) win.webContents.reload()
+      })
+  })
 
   return win
 }

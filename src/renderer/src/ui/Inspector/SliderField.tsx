@@ -1,6 +1,7 @@
 // Thanh trượt có nhãn + giá trị, dùng cho các thuộc tính clip.
 // Mỗi lần nhấn chuột → kéo → thả là một "phiên" (session): mọi thay đổi trong phiên gộp thành 1 bước Undo.
 import { useRef, type ReactNode } from 'react'
+import { HelpTip } from '../HelpTip'
 
 interface Props {
   label: string
@@ -18,9 +19,11 @@ interface Props {
   onReset?: () => void
   /** Phần thêm ở cuối dòng tiêu đề, vd. nút keyframe ‹ ◇ ›. */
   extra?: ReactNode
+  /** Hướng dẫn: hiện dấu "?" cạnh nhãn, rê chuột mới hiện. */
+  help?: string
 }
 
-export function SliderField({ label, display, value, min, max, step, disabled, onChange, onReset, extra }: Props): React.JSX.Element {
+export function SliderField({ label, display, value, min, max, step, disabled, onChange, onReset, extra, help }: Props): React.JSX.Element {
   const session = useRef('')
   const newSession = (): void => {
     session.current = `${label}:${performance.now()}`
@@ -29,7 +32,10 @@ export function SliderField({ label, display, value, min, max, step, disabled, o
   return (
     <label className="field slider-field" onDoubleClick={onReset}>
       <span className="slider-head">
-        <span>{label}</span>
+        <span className="with-help">
+          {label}
+          {help && <HelpTip text={help} />}
+        </span>
         <b>{display}</b>
         {extra}
       </span>

@@ -8,6 +8,7 @@ import { DEFAULT_TRANSITION, findCutNear } from '@shared/timeline/transitions'
 import { setTransition } from '../../state/clipActions'
 import { editorStore } from '../../state/editorStore'
 import { projectStore } from '../../state/projectStore'
+import { HelpTip } from '../HelpTip'
 import { Icon } from '../icons'
 
 export function TransitionsTab(): React.JSX.Element {
@@ -31,7 +32,10 @@ export function TransitionsTab(): React.JSX.Element {
 
   return (
     <div className="left-scroll">
-      <h4 className="left-heading">{t('transitionsTab.heading')}</h4>
+      <h4 className="left-heading with-help">
+        {t('transitionsTab.heading')}
+        <HelpTip text={t('transitionsTab.hint')} />
+      </h4>
       <div className="preset-grid">
         {TRANSITION_KINDS.map((kind) => (
           <button key={kind} className="preset-tile" onClick={() => apply(kind)} title={t('transitionsTab.hint')}>
@@ -46,7 +50,7 @@ export function TransitionsTab(): React.JSX.Element {
           </button>
         ))}
       </div>
-      <p className="hint">{notice ?? t('transitionsTab.hint')}</p>
+      {notice && <p className="hint">{notice}</p>}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { createEmptyProject } from '@shared/project/factory'
 import { parseProjectJson } from '@shared/project/migrate'
 import * as ops from '@shared/project/ops'
-import { EFFECTS, coverCrop, splitSizes, type EffectOp } from '@shared/render/effects'
+import { EFFECTS, OVERLAY_KINDS, coverCrop, splitSizes, type EffectOp } from '@shared/render/effects'
 import { compileExpr, evalExpr, ffmpegExpr } from '@shared/render/expr'
 import { createEffectClip, findClip } from '@shared/timeline/clips'
 import { splitClip } from '@shared/timeline/edit'
@@ -18,7 +18,9 @@ function exprsOf(op: EffectOp): string[] {
     case 'hueCycle':
       return [op.degrees]
     case 'transform':
-      return [op.scale, op.dx, op.dy, op.rotate]
+      return [op.scale, op.dx, op.dy, op.rotate, op.sx ?? '1']
+    case 'bars':
+      return [op.size]
     case 'flash':
       return [op.amount]
     case 'rgbSplit':
@@ -38,6 +40,17 @@ describe('biểu thức dùng chung (preview tính giống FFmpeg)', () => {
     expect(evalExpr('0.012*sin(2*PI*t*7)', 1 / 28)).toBeCloseTo(0.012)
   })
 
+  it('thứ tự phép tính và dấu âm đúng như FFmpeg (tự phân tích cú pháp, không dùng eval)', () => {
+    expect(evalExpr('-2*3+4', 0)).toBe(-2)
+    expect(evalExpr('2-3-4', 0)).toBe(-5) // trừ từ trái sang phải
+    expect(evalExpr('8/2/2', 0)).toBe(2)
+    expect(evalExpr('-t*2', 1.5)).toBe(-3)
+    expect(evalExpr('1.25-0.25*clip(t/3,0,1)', 1.5)).toBeCloseTo(1.125)
+    expect(evalExpr('max(1, 2, 5)', 0)).toBe(5)
+    expect(() => compileExpr('sin(t')).toThrow()
+    expect(() => compileExpr('1 2')).toThrow()
+  })
+
   it('tên lạ / ký tự lạ bị từ chối (bắt lỗi gõ sai ngay trong test)', () => {
     expect(() => compileExpr('sinn(t)')).toThrow()
     expect(() => compileExpr('t; alert(1)')).toThrow()
@@ -47,7 +60,7 @@ describe('biểu thức dùng chung (preview tính giống FFmpeg)', () => {
     expect(ffmpegExpr('lt(mod(t,1.1),0.16)*sin(2*PI*t*23)', '(T-2.5)')).toBe('lt(mod((T-2.5),1.1),0.16)*sin(2*PI*(T-2.5)*23)')
   })
 
-  it('42 hiệu ứng: mã không trùng, mọi biểu thức dịch được, có tên tiếng Việt và tiếng Anh', () => {
+  it('mọi hiệu ứng: mã không trùng, mọi biểu thức dịch được, có tên tiếng Việt và tiếng Anh', () => {
     expect(EFFECTS.length).toBeGreaterThanOrEqual(35)
     expect(new Set(EFFECTS.map((e) => e.id)).size).toBe(EFFECTS.length)
     const vi = JSON.parse(readFileSync(join(__dirname, '../src/renderer/src/i18n/vi.json'), 'utf8'))
@@ -56,6 +69,15 @@ describe('biểu thức dùng chung (preview tính giống FFmpeg)', () => {
       for (const op of def.ops) for (const e of exprsOf(op)) expect(Number.isFinite(evalExpr(e, 0.7)), `${def.id}: ${e}`).toBe(true)
       expect(vi.effects.names[def.id], def.id).toBeTruthy()
       expect(en.effects.names[def.id], def.id).toBeTruthy()
+    }
+  })
+
+  it('lớp phủ vẽ luôn đứng cuối (preview và xuất phủ lên sau cùng như nhau); loại lớp phủ hợp lệ', () => {
+    for (const def of EFFECTS) {
+      const firstOverlay = def.ops.findIndex((op) => op.type === 'overlay')
+      if (firstOverlay < 0) continue
+      expect(def.ops.slice(firstOverlay).every((op) => op.type === 'overlay'), def.id).toBe(true)
+      for (const op of def.ops) if (op.type === 'overlay') expect(OVERLAY_KINDS).toContain(op.kind)
     }
   })
 

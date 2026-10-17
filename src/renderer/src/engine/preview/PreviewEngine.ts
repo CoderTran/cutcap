@@ -12,6 +12,7 @@ import { clipCssFilter } from '@shared/render/filters'
 import { placeLayer } from '@shared/render/geometry'
 import { projectDuration } from '@shared/timeline/clips'
 import { clipGainAt } from '@shared/timeline/clipProps'
+import { clipAnimAt } from '@shared/render/clipAnims'
 import { transformAt } from '@shared/timeline/keyframes'
 import { clampedSourceTime } from '@shared/timeline/transitions'
 import { timedClipsBetween, visualLayersAt, type TimedClip } from '@shared/timeline/evaluate'
@@ -200,22 +201,29 @@ export class PreviewEngine {
       const source = clampedSourceTime(item.clip, item.asset, t)
       const expected = source.time / MICROS_PER_SECOND
 
-      // Âm lượng (kể cả > 100% và fade) do GainNode đảm nhiệm; phần tử luôn để 100%
-      const silent = item.track.muted || !item.asset.hasAudio
-      this.pool.setGain(item.clip.id, silent ? 0 : clipGainAt(item.clip, t))
-      if (el.playbackRate !== item.clip.speed) el.playbackRate = item.clip.speed
+      // Video đã xử lý âm thanh: phát file đã xử lý song song, tắt tiếng gốc của video
+      const dub = this.dubFor(project, item, now)
+      if (dub) inUse.add(dub.key)
 
-      if (this.playing && !source.frozen) {
-        if (el.paused) {
-          el.currentTime = expected
-          void el.play().catch(() => {}) // bị ngắt (vd. bấm dừng ngay) – bỏ qua
-        } else if (!el.seeking && Math.abs(el.currentTime - expected) > MAX_DRIFT_SEC) {
-          el.currentTime = expected
+      // Âm lượng (kể cả > 100% và fade) do GainNode đảm nhiệm; phần tử luôn để 100%
+      const gain = item.track.muted ? 0 : clipGainAt(item.clip, t)
+      this.pool.setGain(item.clip.id, dub || !item.asset.hasAudio ? 0 : gain)
+      if (dub) this.pool.setGain(dub.key, gain)
+
+      for (const m of dub ? [el, dub.el] : [el]) {
+        if (m.playbackRate !== item.clip.speed) m.playbackRate = item.clip.speed
+        if (this.playing && !source.frozen) {
+          if (m.paused) {
+            m.currentTime = expected
+            void m.play().catch(() => {}) // bị ngắt (vd. bấm dừng ngay) – bỏ qua
+          } else if (!m.seeking && Math.abs(m.currentTime - expected) > MAX_DRIFT_SEC) {
+            m.currentTime = expected
+          }
+        } else {
+          if (!m.paused) m.pause()
+          // Đang dừng: tua tới đúng frame (lệch dưới nửa frame thì thôi)
+          if (!m.seeking && Math.abs(m.currentTime - expected) > frameSec / 2) m.currentTime = expected
         }
-      } else {
-        if (!el.paused) el.pause()
-        // Đang dừng: tua tới đúng frame (lệch dưới nửa frame thì thôi)
-        if (!el.seeking && Math.abs(el.currentTime - expected) > frameSec / 2) el.currentTime = expected
       }
     }
 
@@ -226,8 +234,12 @@ export class PreviewEngine {
         const el = this.elementFor(item, now)
         if (!el) continue
         inUse.add(item.clip.id)
+        const dub = this.dubFor(project, item, now)
+        if (dub) inUse.add(dub.key)
         const startSec = item.clip.sourceIn / MICROS_PER_SECOND
-        if (el.paused && !el.seeking && Math.abs(el.currentTime - startSec) > 0.05) el.currentTime = startSec
+        for (const m of dub ? [el, dub.el] : [el]) {
+          if (m.paused && !m.seeking && Math.abs(m.currentTime - startSec) > 0.05) m.currentTime = startSec
+        }
       }
     }
 
@@ -239,6 +251,16 @@ export class PreviewEngine {
     const url = this.playbackUrl(item.asset.path)
     if (!url) return null // proxy chưa tạo xong
     return this.pool.mediaFor(item.clip.id, url, item.asset.kind === 'audio' ? 'audio' : 'video', now)
+  }
+
+  /** Phần tử phát file âm thanh đã xử lý (giảm ồn, đổi giọng…) của clip video; null nếu clip dùng tiếng gốc. */
+  private dubFor(project: Project, item: TimedClip, now: number): { key: Id; el: HTMLMediaElement } | null {
+    const id = item.clip.audioAssetId
+    const asset = id ? project.assets[id] : undefined
+    const url = asset ? this.playbackUrl(asset.path) : null
+    if (!url) return null // chưa có file / chưa sẵn sàng → tạm phát tiếng gốc
+    const key = `${item.clip.id}#audio`
+    return { key, el: this.pool.mediaFor(key, url, 'audio', now) }
   }
 
   // ───────── Vẽ ─────────
@@ -294,7 +316,24 @@ export class PreviewEngine {
       }
       if (!source) continue
 
-      const p = placeLayer(srcW, srcH, W, H, transformAt(clip, t))
+      // Biến đổi tại t (keyframe) + hiệu ứng động Vào/Ra/Kết hợp cộng dồn lên trên (giống khi xuất)
+      const tf = transformAt(clip, t)
+      const anim = clip.type === 'media' ? clipAnimAt(clip, t) : null
+      const p = placeLayer(
+        srcW,
+        srcH,
+        W,
+        H,
+        anim
+          ? {
+              x: tf.x + anim.dx,
+              y: tf.y + anim.dy,
+              scale: tf.scale * anim.scale,
+              rotation: tf.rotation + anim.rot,
+              opacity: tf.opacity * anim.alpha
+            }
+          : tf
+      )
       const fx = layer.effect
       ctx.save()
       // Chuyển cảnh "phóng to": phóng cả lớp quanh TÂM KHUNG (giống zoompan của FFmpeg khi xuất)
@@ -309,6 +348,7 @@ export class PreviewEngine {
       ctx.filter = clip.type === 'media' ? clipCssFilter(clip, hover?.clipId === clip.id ? hover : undefined) : 'none'
       ctx.translate(p.cx + fx.offsetX * W, p.cy)
       ctx.rotate(p.rotation)
+      if (anim && anim.sx !== 1) ctx.scale(anim.sx, 1) // lật như tấm thẻ
       ctx.drawImage(source, -p.width / 2, -p.height / 2, p.width, p.height)
       ctx.restore()
       layout.push({ clipId: clip.id, rect: { x: p.cx - p.width / 2, y: p.cy - p.height / 2, w: p.width, h: p.height } })

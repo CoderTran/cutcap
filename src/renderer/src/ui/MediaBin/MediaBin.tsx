@@ -4,6 +4,7 @@ import { useMemo, useState, type DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { fileNameOf } from '@shared/media/formats'
 import type { MediaKind } from '@shared/project/schema'
+import { processedAudioAssetIds } from '@shared/timeline/detach'
 import { dismissImportErrors, importPaths, pickAndImport } from '../../state/mediaActions'
 import { pathKey, useMediaStore } from '../../state/mediaStore'
 import { useProjectStore } from '../../state/projectStore'
@@ -21,6 +22,9 @@ const hasExternalFiles = (e: DragEvent): boolean => e.dataTransfer.types.include
 export function MediaBin({ only }: { only?: MediaKind }): React.JSX.Element {
   const { t } = useTranslation()
   const assetsById = useProjectStore((s) => s.project.assets)
+  const tracks = useProjectStore((s) => s.project.tracks)
+  // File âm thanh đã xử lý (giảm ồn…) là bản phụ của clip → không hiện trong thư viện
+  const hidden = useMemo(() => processedAudioAssetIds(tracks), [tracks])
   const importing = useMediaStore((s) => s.importing)
   const importErrors = useMediaStore((s) => s.importErrors)
   const missingCount = useMediaStore(
@@ -34,10 +38,10 @@ export function MediaBin({ only }: { only?: MediaKind }): React.JSX.Element {
   const assets = useMemo(() => {
     const q = query.trim().toLocaleLowerCase('vi')
     return Object.values(assetsById)
-      .filter((a) => (kind === 'all' || a.kind === kind) && (!q || a.name.toLocaleLowerCase('vi').includes(q)))
+      .filter((a) => !hidden.has(a.id) && (kind === 'all' || a.kind === kind) && (!q || a.name.toLocaleLowerCase('vi').includes(q)))
       .sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }))
-  }, [assetsById, kind, query])
-  const total = Object.values(assetsById).filter((a) => !only || a.kind === only).length
+  }, [assetsById, hidden, kind, query])
+  const total = Object.values(assetsById).filter((a) => !hidden.has(a.id) && (!only || a.kind === only)).length
 
   // dragenter/dragleave bắn cả khi di chuột qua phần tử con → đếm "độ sâu" để không bị nháy
   const onDragEnter = (e: DragEvent): void => {

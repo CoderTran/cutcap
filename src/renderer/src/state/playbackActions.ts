@@ -33,6 +33,24 @@ export function stepFrames(n: number): void {
   setCurrentTime(Math.min(projectDuration(projectStore.getState().project), Math.max(0, index * frame)))
 }
 
+let rangeTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Phát thử một đoạn rồi dừng (vd. vừa chọn hiệu ứng động → xem ngay, giống CapCut).
+ * Gọi lần nữa trước khi xong thì đoạn cũ bị hủy.
+ */
+export function playRange(start: number, duration: number): void {
+  if (!engine) return
+  if (rangeTimer) clearTimeout(rangeTimer)
+  engine.pause()
+  editorStore.getState().setCurrentTime(start)
+  engine.play()
+  rangeTimer = setTimeout(() => {
+    rangeTimer = null
+    engine?.pause()
+  }, duration / 1000 + 120)
+}
+
 export function goToStart(): void {
   editorStore.getState().setCurrentTime(0)
 }

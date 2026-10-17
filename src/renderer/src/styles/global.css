@@ -1848,3 +1848,250 @@ body.dragging-keyframe * {
   border-radius: 6px;
   user-select: text;
 }
+
+/* ---------- Màn hình báo lỗi (ErrorBoundary) ---------- */
+.crash {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+}
+.crash-box {
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 22px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.crash-box h2 {
+  margin: 0;
+  font-size: 17px;
+  color: var(--danger);
+}
+.crash-detail {
+  max-height: 50vh;
+}
+
+/* ---------- Hiệu ứng động (bảng phải) ---------- */
+.anim-kinds button {
+  position: relative;
+}
+.anim-dot {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+.anim-grid {
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+}
+.anim-grid .preset-name {
+  font-size: 11px;
+}
+.preset-tile.active .effect-thumb {
+  border-color: var(--accent);
+}
+.tile-add.anim-check {
+  opacity: 1;
+}
+
+/* Thanh thời lượng 2 đầu (Kết hợp) */
+.combo-range {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--text-dim);
+}
+.combo-range.disabled {
+  opacity: 0.5;
+}
+.combo-track {
+  position: relative;
+  height: 6px;
+  margin: 6px 10px;
+  background: var(--panel-3);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.combo-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.combo-handle {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 22px;
+  padding: 0;
+  margin-left: -9px;
+  transform: translateY(-50%);
+  font-size: 13px;
+  font-weight: 700;
+  color: #111;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px #00000080;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.combo-handle:hover:not(:disabled),
+.combo-handle:focus-visible {
+  background: #fff;
+  outline: 2px solid var(--accent);
+}
+
+/* ---------- Trình thay đổi giọng nói ---------- */
+.audio-sub button {
+  position: relative;
+}
+.voice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 8px;
+}
+.voice-tile {
+  aspect-ratio: 1 / 1;
+  padding: 6px;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  background: var(--panel-2);
+  border: 2px solid transparent;
+  border-radius: 8px;
+}
+.voice-tile.active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.voice-tile.working {
+  color: var(--accent);
+}
+
+/* Ô nhập số có nút ▲▼ (Âm lượng dB, Rõ dần / Mờ dần) */
+.number-box {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.number-box:focus-within {
+  border-color: var(--accent);
+}
+.number-box input {
+  width: 64px;
+  padding: 3px 6px;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  text-align: right;
+  background: transparent;
+  border: none;
+}
+.number-spin {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+.number-spin button {
+  width: 16px;
+  height: 11px;
+  padding: 0;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--text-dim);
+  background: transparent;
+  border-radius: 0;
+}
+.number-spin button:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--panel-3);
+}
+.slider-head > b:empty {
+  display: none;
+}
+/* Chuẩn hóa / Cải thiện giọng / Giảm ồn */
+.audio-tools hr {
+  width: 100%;
+  margin: 2px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+.tool-row {
+  color: var(--text);
+}
+.tool-title {
+  font-weight: 600;
+}
+
+/* ---------- Dấu "?" hướng dẫn (HelpTip) ---------- */
+.with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.help-tip {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-dim);
+  border: 1px solid var(--text-dim);
+  border-radius: 50%;
+  cursor: help;
+  user-select: none;
+}
+.help-tip:hover,
+.help-tip:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  outline: none;
+}
+.help-pop {
+  position: fixed;
+  z-index: 300;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text);
+  text-align: left;
+  white-space: normal;
+  background: #2b2c31;
+  border: 1px solid #3a3b41;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #000000a0;
+  pointer-events: none;
+}
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-row .search-box {
+  flex: 1;
+}
+.tool-status {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  font-family: Consolas, monospace;
+  color: var(--accent);
+}

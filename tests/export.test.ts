@@ -1,6 +1,6 @@
 // Test xuất video: phần dựng lệnh (hàm thuần) + xuất thật bằng ffmpeg rồi đọc lại từng điểm ảnh.
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { ExportProgress } from '@shared/ipc'
 import { createEmptyProject } from '@shared/project/factory'
 import * as ops from '@shared/project/ops'
-import type { MediaAsset, Project } from '@shared/project/schema'
+import type { MediaAsset, MediaClip, Project } from '@shared/project/schema'
 import { ffmpegColorFilters, saturateMatrix } from '@shared/render/colorMath'
 import { EFFECTS } from '@shared/render/effects'
 import { createEffectClip, createMediaClip } from '@shared/timeline/clips'
@@ -38,6 +38,21 @@ describe('dựng lệnh xuất (hàm thuần)', () => {
     const g = buildExportGraph(p, { width: 1280, height: 720, fps: 30, pixelFormat: 'yuv420p' })
     expect(g.inputArgs).toEqual([])
     expect(g.filterGraph).toContain('anullsrc')
+  })
+
+  it('video đã xử lý âm thanh: hình từ video, tiếng từ file đã xử lý (đúng đoạn cắt)', () => {
+    const p = createEmptyProject('t')
+    const video: MediaAsset = { id: 'v', kind: 'video', path: 'C:\\v.mp4', name: 'v', durationUs: 10 * S, width: 1280, height: 720, fps: 30, hasAudio: true }
+    const fx: MediaAsset = { id: 'fx', kind: 'audio', path: 'C:\\v (giảm ồn).m4a', name: 'fx', durationUs: 10 * S, width: null, height: null, fps: null, hasAudio: true }
+    ops.addAssets(p, [video, fx])
+    const clip: MediaClip = { ...createMediaClip(video, 0), sourceIn: 2 * S, duration: 3 * S, audioAssetId: 'fx' }
+    ops.addClip(p, p.tracks[0].id, clip)
+    const g = buildExportGraph(p, { width: 1280, height: 720, fps: 30, pixelFormat: 'yuv420p' })
+    const inputs = g.inputArgs.filter((_, i, a) => a[i - 1] === '-i')
+    expect(inputs).toEqual(['C:\\v.mp4', 'C:\\v (giảm ồn).m4a'])
+    expect(g.inputArgs.join(' ')).toContain('-ss 2.000000 -t 3.000000 -i C:\\v (giảm ồn).m4a')
+    expect(g.filterGraph).toMatch(/\[1:a\]atrim=start=0/)
+    expect(g.filterGraph).not.toContain('[0:a]')
   })
 })
 
@@ -81,6 +96,9 @@ describe.skipIf(!existsSync(ffmpeg))('xuất video thật bằng ffmpeg', () => 
       '-t', '4', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', files.red])
     execFileSync(ffmpeg, [...q, '-f', 'lavfi', '-i', 'color=c=blue:s=200x200', '-frames:v', '1', '-update', '1', files.blue])
     execFileSync(ffmpeg, [...q, '-f', 'lavfi', '-i', 'sine=frequency=220', '-t', '3', files.wav])
+    // Ảnh nửa trái đỏ / nửa phải xanh – dùng cho các test hiệu ứng
+    execFileSync(ffmpeg, [...q, '-f', 'lavfi', '-i', 'color=c=red:s=320x360', '-f', 'lavfi', '-i', 'color=c=blue:s=320x360',
+      '-filter_complex', '[0][1]hstack', '-frames:v', '1', '-update', '1', join(dir, 'Nửa.png')])
 
     const asset = (id: string, kind: MediaAsset['kind'], path: string, sec: number, w: number | null, h: number | null): MediaAsset =>
       ({ id, kind, path, name: id, durationUs: sec * S, width: w, height: h, fps: 30, hasAudio: kind !== 'image' })
@@ -223,11 +241,9 @@ describe.skipIf(!existsSync(ffmpeg))('xuất video thật bằng ffmpeg', () => 
     expect(late - early).toBeLessThan(18)
   }, 120_000)
 
-  it('hiệu ứng: cả 42 hiệu ứng đều xuất được (FFmpeg chạy không lỗi)', async () => {
-    // Nền: ảnh nửa trái đỏ / nửa phải xanh, 1.2s; hiệu ứng phủ 0.2–1.0s
+  it('hiệu ứng: mọi hiệu ứng đều xuất được (FFmpeg chạy không lỗi)', async () => {
+    // Nền: ảnh nửa trái đỏ / nửa phải xanh (tạo ở beforeAll), 1.2s; hiệu ứng phủ 0.2–1.0s
     const half = join(dir, 'Nửa.png')
-    execFileSync(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=320x360', '-f', 'lavfi', '-i', 'color=c=blue:s=320x360',
-      '-filter_complex', '[0][1]hstack', '-frames:v', '1', '-update', '1', half])
     const failures: string[] = []
     for (const def of EFFECTS) {
       const p = createEmptyProject('fx')
@@ -245,7 +261,7 @@ describe.skipIf(!existsSync(ffmpeg))('xuất video thật bằng ffmpeg', () => 
   }, 300_000)
 
   it('hiệu ứng: hình ra đúng (gương, lật, điện ảnh, âm bản, đen trắng, chia 4, chớp sáng)', async () => {
-    const half = join(dir, 'Nửa.png') // tạo ở test trên: trái đỏ, phải xanh
+    const half = join(dir, 'Nửa.png') // tạo ở beforeAll: trái đỏ, phải xanh
     const run = async (effectId: string): Promise<string> => {
       const p = createEmptyProject('fx')
       p.settings.resolution = '720p'
@@ -280,6 +296,59 @@ describe.skipIf(!existsSync(ffmpeg))('xuất video thật bằng ffmpeg', () => 
     expect(pixelAt(flash, 0, 200, 360)[1]).toBeGreaterThan(200)
     expect(near(pixelAt(flash, 0.9, 200, 360), red, 25)).toBe(true)
   }, 300_000)
+
+  it('hiệu ứng có lớp phủ vẽ: khung PNG vẽ sẵn được phủ lên đúng lúc', async () => {
+    const half = join(dir, 'Nửa.png')
+    // Giả lập lớp phủ đã vẽ sẵn: ô vuông trắng 100×100 ở giữa khung 1280×720, nền trong suốt
+    const png = join(dir, 'phu.png')
+    execFileSync(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=white:s=100x100',
+      '-vf', 'format=rgba,pad=1280:720:590:310:color=black@0', '-frames:v', '1', '-update', '1', png])
+    const frame = new Uint8Array(readFileSync(png))
+    const p = createEmptyProject('fx')
+    p.settings.resolution = '720p'
+    p.assets.half = { id: 'half', kind: 'image', path: half, name: 'half', durationUs: 0, width: 640, height: 360, fps: null, hasAudio: false }
+    ops.addClip(p, p.tracks[0].id, { ...createMediaClip(p.assets.half, 0), duration: 2 * S })
+    const fx = { ...createEffectClip(0.5 * S, 'sparkle'), duration: 1 * S }
+    ops.addClip(p, ops.addTrack(p, 'effect'), fx)
+    const out = join(dir, 'fx-overlay.mp4')
+    const exporter = new Exporter({ ffmpegExe: ffmpeg, tempDir: join(dir, 'tmp'), onProgress: () => {} })
+    const result = await exporter.run({
+      project: p,
+      settings: { outputPath: out, resolution: '720p', fps: 30, quality: 'standard', encoder: 'libx264' },
+      textFrames: [{ clipId: fx.id, animated: Array.from({ length: 30 }, () => frame), still: frame }]
+    })
+    expect(result.status, JSON.stringify(result).slice(0, 1500)).toBe('done')
+    expect(near(pixelAt(out, 1, 660, 360), [255, 255, 255])).toBe(true) // trong khoảng hiệu ứng: có lớp phủ
+    expect(near(pixelAt(out, 0.2, 660, 360), [0, 0, 255])).toBe(true) // trước hiệu ứng: ảnh gốc (nửa phải xanh)
+    expect(near(pixelAt(out, 1.8, 660, 360), [0, 0, 255])).toBe(true) // sau hiệu ứng: hết lớp phủ
+  }, 120_000)
+
+  it('hiệu ứng động: trượt vào từ bên phải, Kết hợp mờ vào/ra – đúng như preview', async () => {
+    const half = join(dir, 'Nửa.png')
+    const run = async (changes: Partial<MediaClip>, name: string): Promise<string> => {
+      const p = createEmptyProject('anim')
+      p.settings.resolution = '720p'
+      p.assets.half = { id: 'half', kind: 'image', path: half, name: 'half', durationUs: 0, width: 640, height: 360, fps: null, hasAudio: false }
+      ops.addClip(p, p.tracks[0].id, { ...createMediaClip(p.assets.half, 0), duration: 2 * S, ...changes })
+      const out = join(dir, name)
+      const exporter = new Exporter({ ffmpegExe: ffmpeg, tempDir: join(dir, 'tmp'), onProgress: () => {} })
+      const result = await exporter.run({ project: p, settings: { outputPath: out, resolution: '720p', fps: 30, quality: 'standard', encoder: 'libx264' }, textFrames: [] })
+      expect(result.status).toBe('done')
+      return out
+    }
+    // Trượt sang trái (vào từ bên phải) 1 giây: t=0 ảnh còn ở ngoài → nền đen; t=0.5 đã vào phần lớn; sau 1s đúng chỗ
+    const slide = await run({ animIn: { id: 'slideLeft', duration: 1 * S } }, 'anim-slide.mp4')
+    expect(near(pixelAt(slide, 0, 200, 360), [0, 0, 0])).toBe(true)
+    // t=0.5: dời 1−(1−0.5³)… = 0.125 khung → điểm x=200 lấy từ x=40 của ảnh (vẫn nửa đỏ)
+    expect(near(pixelAt(slide, 0.5, 400, 360), [255, 0, 0])).toBe(true)
+    expect(near(pixelAt(slide, 1.5, 200, 360), [255, 0, 0])).toBe(true)
+    expect(near(pixelAt(slide, 1.5, 1000, 360), [0, 0, 255])).toBe(true)
+    // Kết hợp mờ dần 0.5s mỗi đầu: giữa clip rõ, đầu/cuối gần như đen
+    const combo = await run({ animCombo: { id: 'fade', duration: 0.5 * S } }, 'anim-combo.mp4')
+    expect(pixelAt(combo, 0, 200, 360)[0]).toBeLessThan(30)
+    expect(near(pixelAt(combo, 1, 200, 360), [255, 0, 0])).toBe(true)
+    expect(pixelAt(combo, 1.95, 200, 360)[0]).toBeLessThan(60)
+  }, 120_000)
 
   it('hủy giữa chừng: không để lại file dở dang', async () => {
     // Video dài 40s để kịp hủy

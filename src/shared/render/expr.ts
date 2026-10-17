@@ -3,10 +3,12 @@
 // Công thức chuyển động của hiệu ứng (rung, nhịp đập, chớp sáng…) viết MỘT LẦN theo cú pháp biểu thức
 // của FFmpeg, ví dụ "0.04*sin(2*PI*t*3)":
 //   - Xuất video: đưa thẳng vào bộ lọc FFmpeg (thay "t" bằng thời gian cục bộ của hiệu ứng)
-//   - Preview: dịch sang hàm JavaScript và tính trực tiếp
+//   - Preview: phân tích cú pháp thành cây biểu thức rồi tính bằng JavaScript
 // → hai bên tính ra đúng cùng một con số.
 //
-// Chỉ hỗ trợ tập con an toàn: số, t, PI, + − × ÷, ( ), và các hàm trong FUNCS.
+// Tự phân tích cú pháp (không dùng eval / new Function) → chạy được dưới chính sách bảo mật (CSP)
+// chặn eval của giao diện, và không thể chạy mã lạ.
+// Hỗ trợ: số, t, PI, + − × ÷, dấu âm, ( ), và các hàm trong FUNCS.
 
 const FUNCS: Record<string, (...a: number[]) => number> = {
   sin: Math.sin,
@@ -29,38 +31,118 @@ const FUNCS: Record<string, (...a: number[]) => number> = {
   if: (c, a, b) => (c !== 0 ? a : b)
 }
 
-const TOKEN = /\s*(?:(\d+\.?\d*(?:e[+-]?\d+)?|\.\d+)|([A-Za-z_]\w*)|(.))/gy
+type Node =
+  | { k: 'num'; v: number }
+  | { k: 't' }
+  | { k: 'neg'; a: Node }
+  | { k: 'bin'; op: '+' | '-' | '*' | '/'; a: Node; b: Node }
+  | { k: 'call'; f: (...a: number[]) => number; args: Node[] }
+
+type Token = { type: 'num'; v: number } | { type: 'name'; v: string } | { type: 'sym'; v: string }
+
+function tokenize(expr: string): Token[] {
+  const tokens: Token[] = []
+  const re = /\s*(?:(\d+\.?\d*(?:e[+-]?\d+)?|\.\d+)|([A-Za-z_]\w*)|(\S))/gy
+  let m: RegExpExecArray | null
+  while (re.lastIndex < expr.length && (m = re.exec(expr))) {
+    if (m[1] !== undefined) tokens.push({ type: 'num', v: Number(m[1]) })
+    else if (m[2] !== undefined) tokens.push({ type: 'name', v: m[2] })
+    else if (m[3] !== undefined) {
+      if (!'+-*/(),'.includes(m[3])) throw new Error(`Biểu thức có ký tự lạ "${m[3]}": ${expr}`)
+      tokens.push({ type: 'sym', v: m[3] })
+    } else break // chỉ còn khoảng trắng
+  }
+  return tokens
+}
+
+/** Phân tích cú pháp kiểu "đệ quy đi xuống": cộng/trừ < nhân/chia < dấu âm < số/hàm/ngoặc. */
+function parse(expr: string): Node {
+  const tokens = tokenize(expr)
+  let i = 0
+  const peek = (): Token | undefined => tokens[i]
+  const isSym = (v: string): boolean => peek()?.type === 'sym' && peek()!.v === v
+  const expect = (v: string): void => {
+    if (!isSym(v)) throw new Error(`Biểu thức thiếu "${v}": ${expr}`)
+    i++
+  }
+
+  const primary = (): Node => {
+    const tok = tokens[i++]
+    if (!tok) throw new Error(`Biểu thức bị cụt: ${expr}`)
+    if (tok.type === 'num') return { k: 'num', v: tok.v }
+    if (tok.type === 'sym') {
+      if (tok.v === '(') {
+        const inner = sum()
+        expect(')')
+        return inner
+      }
+      if (tok.v === '-') return { k: 'neg', a: primary() }
+      if (tok.v === '+') return primary()
+      throw new Error(`Biểu thức sai ở "${tok.v}": ${expr}`)
+    }
+    if (tok.v === 't') return { k: 't' }
+    if (tok.v === 'PI') return { k: 'num', v: Math.PI }
+    const f = FUNCS[tok.v]
+    if (!f) throw new Error(`Biểu thức có tên lạ "${tok.v}": ${expr}`)
+    expect('(')
+    const args: Node[] = [sum()]
+    while (isSym(',')) {
+      i++
+      args.push(sum())
+    }
+    expect(')')
+    return { k: 'call', f, args }
+  }
+  const product = (): Node => {
+    let node = primary()
+    while (isSym('*') || isSym('/')) {
+      const op = tokens[i++].v as '*' | '/'
+      node = { k: 'bin', op, a: node, b: primary() }
+    }
+    return node
+  }
+  const sum = (): Node => {
+    let node = product()
+    while (isSym('+') || isSym('-')) {
+      const op = tokens[i++].v as '+' | '-'
+      node = { k: 'bin', op, a: node, b: product() }
+    }
+    return node
+  }
+
+  const root = sum()
+  if (i < tokens.length) throw new Error(`Biểu thức thừa phần cuối: ${expr}`)
+  return root
+}
+
+function run(n: Node, t: number): number {
+  switch (n.k) {
+    case 'num':
+      return n.v
+    case 't':
+      return t
+    case 'neg':
+      return -run(n.a, t)
+    case 'bin': {
+      const a = run(n.a, t)
+      const b = run(n.b, t)
+      return n.op === '+' ? a + b : n.op === '-' ? a - b : n.op === '*' ? a * b : a / b
+    }
+    case 'call':
+      return n.f(...n.args.map((x) => run(x, t)))
+  }
+}
 
 export type CompiledExpr = (t: number) => number
 
 const cache = new Map<string, CompiledExpr>()
 
-/**
- * Dịch biểu thức FFmpeg sang hàm JS. Báo lỗi nếu có tên lạ (để bắt lỗi gõ sai ngay trong test).
- * Không dùng eval trực tiếp trên chuỗi người dùng – chỉ dùng cho biểu thức viết sẵn trong mã.
- */
+/** Phân tích biểu thức 1 lần (có cache) → hàm tính theo t. Báo lỗi nếu có tên/ký tự lạ. */
 export function compileExpr(expr: string): CompiledExpr {
   const hit = cache.get(expr)
   if (hit) return hit
-  let js = ''
-  TOKEN.lastIndex = 0
-  let m: RegExpExecArray | null
-  while (TOKEN.lastIndex < expr.length && (m = TOKEN.exec(expr))) {
-    const [, numTok, name, sym] = m
-    if (numTok !== undefined) js += numTok
-    else if (name !== undefined) {
-      if (name === 't') js += 't'
-      else if (name === 'PI') js += 'Math.PI'
-      else if (name in FUNCS) js += `F.${name === 'if' ? 'iff' : name}`
-      else throw new Error(`Biểu thức có tên lạ "${name}": ${expr}`)
-    } else if (sym !== undefined) {
-      if (!'+-*/(),'.includes(sym)) throw new Error(`Biểu thức có ký tự lạ "${sym}": ${expr}`)
-      js += sym
-    }
-  }
-  const F = { ...FUNCS, iff: FUNCS.if }
-  const fn = new Function('F', 't', `return (${js})`) as (f: typeof F, t: number) => number
-  const compiled: CompiledExpr = (t) => fn(F, t)
+  const tree = parse(expr)
+  const compiled: CompiledExpr = (t) => run(tree, t)
   cache.set(expr, compiled)
   return compiled
 }

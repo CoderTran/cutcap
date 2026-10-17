@@ -96,6 +96,12 @@ export function createMediaClip(asset: MediaAsset, start: Micros): MediaClip {
     transform: defaultTransform(),
     transitionIn: null,
     vocalsRemovedFrom: null,
+    animIn: null,
+    animOut: null,
+    animCombo: null,
+    audioFx: null,
+    audioAssetId: null,
+    loudnorm: null,
     keyframes: {}
   }
 }

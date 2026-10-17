@@ -144,6 +144,46 @@ export function karaokeArgs(src: string, dest: string): string[] {
 }
 
 /**
+ * Lệnh đo độ to (chuẩn EBU R128) của đoạn [start, start+duration) giây – kết quả ở stderr (xem parseIntegratedLoudness).
+ */
+export function loudnessArgs(src: string, startSec: number, durationSec: number): string[] {
+  return [
+    '-hide_banner', '-nostats',
+    '-ss', startSec.toFixed(3), '-t', durationSec.toFixed(3),
+    '-i', src,
+    '-map', '0:a:0', '-vn',
+    '-af', 'ebur128=framelog=quiet',
+    '-f', 'null', '-'
+  ]
+}
+
+/**
+ * Lấy "Integrated loudness" (LUFS) từ phần tổng kết của bộ lọc ebur128.
+ * @returns null nếu không đo được (vd. đoạn quá ngắn / im lặng hoàn toàn → -70 LUFS trở xuống)
+ */
+export function parseIntegratedLoudness(stderr: string): number | null {
+  const block = stderr.slice(stderr.lastIndexOf('Integrated loudness'))
+  const m = /I:\s+(-?[\d.]+)\s+LUFS/.exec(block)
+  if (!m) return null
+  const v = Number(m[1])
+  return Number.isFinite(v) && v > -70 ? v : null
+}
+
+/** Lệnh "thay đổi giọng nói": chạy chuỗi bộ lọc âm thanh `af` (xem shared/render/voices.ts) ra file .m4a. */
+export function voiceArgs(src: string, dest: string, af: string): string[] {
+  return [
+    '-hide_banner', '-loglevel', 'error', '-y',
+    '-i', src,
+    '-map', '0:a:0', '-vn', '-sn', '-dn',
+    '-af', af,
+    '-c:a', 'aac', '-b:a', '192k',
+    '-movflags', '+faststart',
+    '-f', 'mp4',
+    dest
+  ]
+}
+
+/**
  * Lệnh tạo proxy. Ghi tiến trình ra stdout ("-progress pipe:1") để hiện thanh phần trăm.
  * @param dest đường dẫn file tạm; caller đổi tên sau khi xong (để không bao giờ dùng nhầm file dở dang)
  */

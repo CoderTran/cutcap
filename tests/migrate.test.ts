@@ -38,6 +38,12 @@ function sampleProject(): Project {
     transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
     transitionIn: null,
     vocalsRemovedFrom: null,
+    animIn: null,
+    animOut: null,
+    animCombo: null,
+    audioFx: null,
+    audioAssetId: null,
+    loudnorm: null,
     keyframes: {}
   })
   return p

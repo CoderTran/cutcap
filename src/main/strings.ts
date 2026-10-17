@@ -14,6 +14,9 @@ const vi = {
   btnDiscard: 'Không lưu',
   btnCancel: 'Hủy',
   importTitle: 'Nhập media',
+  rendererCrashed: 'Giao diện Cutcap vừa bị dừng đột ngột',
+  rendererCrashedDetail: 'Dự án của bạn vẫn còn trong bản tự động lưu. Bấm "Tải lại" để mở lại giao diện. Nếu lỗi lặp lại, hãy cập nhật trình điều khiển card đồ họa (driver) và gửi dòng bên dưới cho người phát triển.',
+  reload: 'Tải lại',
   extractAudioTitle: 'Chọn video để trích xuất âm thanh',
   /** Thư mục con (trong thư mục dự án) chứa các file âm thanh tách từ video. */
   extractedAudioFolder: 'Âm thanh trích xuất',

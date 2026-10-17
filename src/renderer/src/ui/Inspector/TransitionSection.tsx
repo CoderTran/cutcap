@@ -1,4 +1,5 @@
 // Mục "Chuyển cảnh" của clip: chuyển cảnh từ clip ngay trước vào clip này.
+import { HelpTip } from '../HelpTip'
 import { useTranslation } from 'react-i18next'
 import { TRANSITION_KINDS, type MediaClip, type Track } from '@shared/project/schema'
 import { MICROS_PER_SECOND } from '@shared/project/time'
@@ -20,7 +21,10 @@ export function TransitionSection({ clip, track }: { clip: MediaClip; track: Tra
 
   return (
     <section className="inspector-section">
-      <h4>{t('transition.title')}</h4>
+      <h4 className="with-help">
+        {t('transition.title')}
+        <HelpTip text={t('transition.hint')} />
+      </h4>
       <div className="transition-grid">
         <button className={!active ? 'active' : ''} disabled={disabled} onClick={() => setTransition(clip.id, null, duration)}>
           ✕ {t('transition.none')}
@@ -49,7 +53,6 @@ export function TransitionSection({ clip, track }: { clip: MediaClip; track: Tra
           onReset={() => setTransition(clip.id, active.kind, DEFAULT_TRANSITION)}
         />
       )}
-      <p className="hint">{t('transition.hint')}</p>
     </section>
   )
 }

@@ -6,6 +6,7 @@ import { EFFECT_CATEGORIES, EFFECTS, findEffect } from '@shared/render/effects'
 import { clipEnd } from '@shared/timeline/clips'
 import { setEffectId } from '../../state/effectActions'
 import { useProjectStore } from '../../state/projectStore'
+import { HelpTip } from '../HelpTip'
 
 export function EffectPanel({ clip, disabled }: { clip: EffectClip; disabled: boolean }): React.JSX.Element {
   const { t } = useTranslation()
@@ -16,7 +17,10 @@ export function EffectPanel({ clip, disabled }: { clip: EffectClip; disabled: bo
     <div className="form">
       {disabled && <p className="hint">🔒 {t('clip.locked')}</p>}
       <section className="inspector-section">
-        <h4>{t('effects.panelTitle')}</h4>
+        <h4 className="with-help">
+          {t('effects.panelTitle')}
+          <HelpTip text={t('effects.panelHint')} />
+        </h4>
         <label className="field">
           <span>{t('effects.current')}</span>
           <select value={clip.effectId} disabled={disabled} onChange={(e) => setEffectId(clip.id, e.target.value)}>
@@ -32,7 +36,6 @@ export function EffectPanel({ clip, disabled }: { clip: EffectClip; disabled: bo
             ))}
           </select>
         </label>
-        <p className="hint">{t('effects.panelHint')}</p>
       </section>
       <section className="inspector-section">
         <dl className="info-list">

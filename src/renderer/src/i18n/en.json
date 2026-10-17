@@ -1,0 +1,300 @@
+{
+  "panels": {
+    "media": "Media",
+    "preview": "Preview",
+    "inspector": "Properties",
+    "timeline": "Timeline"
+  },
+  "toolbar": {
+    "newProject": "New project",
+    "open": "Open",
+    "save": "Save",
+    "saveAs": "Save as…",
+    "undo": "Undo",
+    "redo": "Redo",
+    "export": "Export",
+    "exportRunning": "Exporting – click to view"
+  },
+  "project": {
+    "untitled": "Untitled project",
+    "unsaved": "Unsaved changes",
+    "notSavedYet": "Project not saved yet"
+  },
+  "settings": {
+    "title": "Project settings",
+    "name": "Project name",
+    "aspectRatio": "Aspect ratio",
+    "resolution": "Resolution",
+    "resolutions": {
+      "720p": "720p (HD)",
+      "1080p": "1080p (Full HD)",
+      "4k": "4K (Ultra HD)"
+    },
+    "fps": "Frame rate",
+    "canvasSize": "Video size: {{width}} × {{height}}"
+  },
+  "timeline": {
+    "zoom": "Timeline zoom",
+    "zoomIn": "Zoom in (Ctrl + wheel)",
+    "zoomOut": "Zoom out (Ctrl + wheel)",
+    "fit": "Fit",
+    "fitHint": "Zoom to show the whole project",
+    "dropHint": "Drag videos, images or audio from the Media library here",
+    "newTrack": "New {{kind}} track",
+    "split": "Split",
+    "splitHint": "Split clip at playhead (Ctrl+B)",
+    "delete": "Delete",
+    "deleteHint": "Delete selected clips (Delete)",
+    "addText": "Add text",
+    "addTextHint": "Add text at the playhead"
+  },
+  "track": {
+    "kind": {
+      "video": "Video",
+      "audio": "Audio",
+      "text": "Text",
+      "sticker": "Sticker"
+    },
+    "hide": "Hide / show track",
+    "mute": "Mute / unmute",
+    "lock": "Lock / unlock",
+    "remove": "Delete track",
+    "clipCount_one": "{{count}} clip",
+    "clipCount_other": "{{count}} clips"
+  },
+  "history": {
+    "renameProject": "Rename project",
+    "changeSettings": "Change project settings",
+    "addTrack": "Add track",
+    "removeTrack": "Delete track",
+    "track": {
+      "muted": "Toggle track mute",
+      "hidden": "Toggle track visibility",
+      "locked": "Toggle track lock"
+    },
+    "importMedia": "Import media",
+    "removeMedia": "Remove media",
+    "addClip": "Add clip to timeline",
+    "moveClips": "Move clips",
+    "trimClip": "Trim clip",
+    "splitClip": "Split clip",
+    "deleteClips": "Delete clips",
+    "pasteClips": "Paste clips",
+    "clipSpeed": "Change clip speed",
+    "clipVolume": "Change clip volume",
+    "clipFade": "Change clip fade",
+    "addText": "Add text",
+    "editText": "Edit text",
+    "textStyle": "Change text style",
+    "textAnimation": "Change text animation",
+    "transform": "Move / resize",
+    "transition": "Change transition",
+    "clipColor": "Change clip color",
+    "colorToAll": "Apply color to all clips",
+    "relinkMedia": "Relink media"
+  },
+  "status": {
+    "loading": "Loading…",
+    "version": "Version {{version}}"
+  },
+  "media": {
+    "import": "Import",
+    "importing": "Importing…",
+    "filter": {
+      "all": "All",
+      "video": "Video",
+      "image": "Images",
+      "audio": "Audio"
+    },
+    "dropHint": "Drop videos, images and audio here or click to choose files",
+    "formats": "MP4, MOV, MKV, AVI, WEBM, JPG, PNG, HEIC, MP3, WAV, M4A…",
+    "dropHere": "Drop files here to import",
+    "loading": "Reading…",
+    "missing": "File not found",
+    "error": "Cannot read file",
+    "proxyQueued": "Waiting to optimize…",
+    "proxyRunning": "Optimizing {{percent}}%",
+    "proxyHint": "Creating a lightweight copy for smooth preview. Export still uses the original file.",
+    "proxyError": "Optimization failed",
+    "remove": "Remove from library",
+    "inUse": "Used on the timeline – cannot remove",
+    "importErrors_one": "Could not import {{count}} file",
+    "importErrors_other": "Could not import {{count}} files",
+    "dismiss": "Dismiss",
+    "errors": {
+      "unsupported": "unsupported format",
+      "unreadable": "corrupted or unreadable",
+      "missing": "file not found",
+      "ffmpeg-missing": "FFmpeg missing (run: npm run setup:ffmpeg)"
+    },
+    "relink": "Locate",
+    "missingNotice": "{{count}} source files not found – click \"Locate\" on a card to pick the new location."
+  },
+  "inspector": {
+    "multiSelected": "{{count}} clips selected"
+  },
+  "clip": {
+    "track": "Track",
+    "start": "Start",
+    "end": "End",
+    "duration": "Duration",
+    "sourceIn": "Source in",
+    "speed": "Playback speed",
+    "resolution": "Resolution",
+    "speedTitle": "Speed",
+    "speedTruncated": "The clip will be shortened because it reaches the next clip",
+    "speedResult": "Source section {{source}} → {{duration}} on the timeline",
+    "audioTitle": "Audio",
+    "volume": "Volume",
+    "muted": "Muted",
+    "fadeIn": "Fade in",
+    "fadeOut": "Fade out",
+    "resetHint": "Double-click a slider to reset it.",
+    "infoTitle": "Info",
+    "locked": "Track is locked – unlock it to edit."
+  },
+  "preview": {
+    "toStart": "Go to start (Home)",
+    "playPause": "Play / Pause (Space)",
+    "toEnd": "Go to end (End)"
+  },
+  "export": {
+    "title": "Export video",
+    "file": "File",
+    "noPath": "Not chosen – you will be asked on Export",
+    "choose": "Choose…",
+    "quality": "Quality",
+    "qualities": {
+      "high": "High",
+      "standard": "Standard",
+      "small": "Small"
+    },
+    "qualityHint": {
+      "high": "Best quality, large file",
+      "standard": "Balanced quality and size",
+      "small": "Small file, good for sharing"
+    },
+    "encoder": "Encoder",
+    "auto": "Automatic ({{name}})",
+    "detecting": "Checking GPU…",
+    "encoders": {
+      "h264_nvenc": "NVIDIA GPU (NVENC)",
+      "h264_qsv": "Intel GPU (Quick Sync)",
+      "h264_amf": "AMD GPU (AMF)",
+      "libx264": "CPU (x264)"
+    },
+    "summary": "MP4 H.264 · {{width}} × {{height}} · {{fps}} fps · {{duration}} long",
+    "cancel": "Cancel",
+    "start": "Export",
+    "empty": "Timeline is empty",
+    "running": "Exporting video…",
+    "percent": "Progress",
+    "elapsed": "Elapsed",
+    "eta": "Remaining",
+    "speed": "Speed",
+    "backgroundHint": "You can run it in the background and keep editing – the export is not affected.",
+    "stop": "Stop export",
+    "runInBackground": "Run in background",
+    "done": "Export finished",
+    "doneDetail": "{{size}} · took {{time}} · {{encoder}}",
+    "cancelled": "Export stopped",
+    "failed": "Export failed",
+    "details": "Technical details",
+    "errors": {
+      "empty": "The timeline is empty, nothing to export.",
+      "missing": "Source files not found: {{files}}",
+      "ffmpeg": "FFmpeg reported an error while exporting. See details below."
+    },
+    "reveal": "Show in folder",
+    "close": "Close"
+  },
+  "text": {
+    "title": "Text",
+    "placeholder": "Type your text…",
+    "default": "Your text here",
+    "styleTitle": "Style",
+    "font": "Font",
+    "size": "Size",
+    "color": "Color",
+    "bold": "Bold",
+    "italic": "Italic",
+    "align": {
+      "left": "Align left",
+      "center": "Center",
+      "right": "Align right"
+    },
+    "stroke": "Outline",
+    "strokeWidth": "Outline width",
+    "background": "Background",
+    "animationTitle": "Animation",
+    "animationIn": "In animation",
+    "animationDuration": "Animation duration",
+    "animations": {
+      "none": "None",
+      "fade": "Fade",
+      "slide-up": "Slide up",
+      "zoom": "Zoom",
+      "typewriter": "Typewriter"
+    }
+  },
+  "transform": {
+    "title": "Transform",
+    "scale": "Scale",
+    "rotation": "Rotation",
+    "opacity": "Opacity",
+    "dragHint": "Drag in the Preview to move it.",
+    "center": "Center"
+  },
+  "transition": {
+    "title": "Transition",
+    "none": "None",
+    "add": "Add transition",
+    "duration": "Duration",
+    "kinds": {
+      "fade": "Fade",
+      "slide-left": "Slide left",
+      "slide-right": "Slide right",
+      "zoom": "Zoom"
+    },
+    "hint": "Transition from the previous clip into this one, centred on the cut – video length is unchanged."
+  },
+  "color": {
+    "title": "Color",
+    "filters": "Filters",
+    "intensity": "Filter strength",
+    "adjust": "Adjust",
+    "brightness": "Brightness",
+    "contrast": "Contrast",
+    "saturation": "Saturation",
+    "reset": "Reset color",
+    "applyAll": "Apply to all clips",
+    "appliedAll": "Applied to {{count}} clips",
+    "hoverHint": "Hover a filter to preview it."
+  },
+  "filters": {
+    "none": "Original",
+    "vivid": "Vivid",
+    "warm": "Warm",
+    "cool": "Cool",
+    "bw": "Black & white",
+    "vintage": "Vintage",
+    "faded": "Faded",
+    "dramatic": "Dramatic",
+    "sunset": "Sunset"
+  },
+  "start": {
+    "title": "Welcome to Cutcap",
+    "new": "New project",
+    "open": "Open project…",
+    "recent": "Recent projects",
+    "noRecent": "No projects yet.",
+    "remove": "Remove from list",
+    "close": "Close",
+    "recoverTitle": "Recover unsaved project",
+    "recoverText": "Cutcap was closed with unsaved changes last time. Do you want to open the auto-saved copy?",
+    "recover": "Recover",
+    "discard": "Discard",
+    "savedAt": "Auto-saved at {{time}}",
+    "neverSaved": "Never saved"
+  }
+}

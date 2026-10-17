@@ -1,0 +1,61 @@
+# Cấu hình đóng gói bộ cài Windows (electron-builder).
+# Build: npm run dist   →   dist/Cutcap-Setup-<phiên bản>.exe
+appId: vn.cutcap.app            # phải khớp app.setAppUserModelId() trong src/main/index.ts
+productName: Cutcap
+copyright: Copyright © 2026 Cutcap contributors
+
+directories:
+  output: dist
+  buildResources: build
+
+# Chỉ đóng gói mã đã build. Thư viện giao diện đã được gộp sẵn vào out/renderer,
+# main process chỉ dùng thư viện có sẵn của Node/Electron → không cần node_modules.
+files:
+  - out/**
+  - package.json
+
+# FFmpeg + giấy phép đặt cạnh app (không nén vào app.asar – ffmpeg.exe phải chạy được trực tiếp)
+# → <thư mục cài>/resources/ffmpeg/ (xem ffmpegDir() trong src/main/ipc/mediaHandlers.ts)
+extraResources:
+  - from: resources/ffmpeg
+    to: ffmpeg
+    filter:
+      - '*.exe'
+      - '*.dll'
+      - LICENSE.txt
+      - ffmpeg-build.json
+extraFiles:
+  - LICENSE
+  - THIRD_PARTY_NOTICES.md
+
+asar: true
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+  # Tên hiện trong Task Manager, Thuộc tính file… (tự lấy từ productName/version)
+  legalTrademarks: Cutcap
+
+# Bấm đúp file .cutcap → mở bằng Cutcap (tham số dòng lệnh, xem projectPathFromArgv)
+fileAssociations:
+  - ext: cutcap
+    name: Cutcap Project
+    description: Dự án Cutcap
+    icon: build/file-icon.ico
+    role: Editor
+
+nsis:
+  oneClick: false                          # bộ cài có các bước (chọn thư mục…), không cài "một chạm"
+  perMachine: false                        # cài cho người dùng hiện tại → không cần quyền Administrator
+  allowElevation: true                     # nhưng vẫn cho chọn "cài cho mọi người dùng" nếu muốn
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Cutcap
+  license: LICENSE                         # hiện giấy phép GPL-3.0 trong bộ cài
+  installerLanguages: [vi_VN, en_US]
+  language: '1066'                         # 1066 = tiếng Việt
+  artifactName: ${productName}-Setup-${version}.${ext}
+  deleteAppDataOnUninstall: false          # gỡ cài đặt KHÔNG xóa dự án/cache của người dùng

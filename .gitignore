@@ -1,0 +1,19 @@
+node_modules/
+out/
+dist/
+*.log
+*.tmp
+*.part
+# FFmpeg nặng ~100 MB, không đưa vào git – xem resources/ffmpeg/README.md
+resources/ffmpeg/*.exe
+resources/ffmpeg/*.dll
+resources/ffmpeg/LICENSE.txt
+resources/ffmpeg/ffmpeg-build.json
+# File hệ thống Windows / OneDrive
+Thumbs.db
+desktop.ini
+# Cài đặt riêng của trình soạn thảo
+.vscode/
+.idea/
+# Cấu hình riêng của công cụ Claude trên máy
+.claude/

@@ -1,0 +1,7 @@
+# Lưu file văn bản trong git với kiểu xuống dòng LF; Git tự đổi sang CRLF khi lấy về Windows nếu cần.
+* text=auto eol=lf
+# File nhị phân – không bao giờ đổi
+*.png binary
+*.ico binary
+*.jpg binary
+*.mp4 binary

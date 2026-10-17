@@ -1,0 +1,300 @@
+{
+  "panels": {
+    "media": "Thư viện media",
+    "preview": "Xem trước",
+    "inspector": "Thuộc tính",
+    "timeline": "Timeline"
+  },
+  "toolbar": {
+    "newProject": "Dự án mới",
+    "open": "Mở",
+    "save": "Lưu",
+    "saveAs": "Lưu thành…",
+    "undo": "Hoàn tác",
+    "redo": "Làm lại",
+    "export": "Xuất video",
+    "exportRunning": "Đang xuất video – bấm để xem"
+  },
+  "project": {
+    "untitled": "Dự án chưa đặt tên",
+    "unsaved": "Có thay đổi chưa lưu",
+    "notSavedYet": "Dự án chưa được lưu"
+  },
+  "settings": {
+    "title": "Cài đặt dự án",
+    "name": "Tên dự án",
+    "aspectRatio": "Tỉ lệ khung hình",
+    "resolution": "Độ phân giải",
+    "resolutions": {
+      "720p": "720p (HD)",
+      "1080p": "1080p (Full HD)",
+      "4k": "4K (Ultra HD)"
+    },
+    "fps": "Tốc độ khung hình",
+    "canvasSize": "Kích thước video: {{width}} × {{height}}"
+  },
+  "timeline": {
+    "zoom": "Thu phóng timeline",
+    "zoomIn": "Phóng to (Ctrl + lăn chuột)",
+    "zoomOut": "Thu nhỏ (Ctrl + lăn chuột)",
+    "fit": "Vừa khung",
+    "fitHint": "Thu phóng để thấy toàn bộ dự án",
+    "dropHint": "Kéo video, ảnh hoặc âm thanh từ Thư viện media thả vào đây",
+    "newTrack": "Track {{kind}} mới",
+    "split": "Tách",
+    "splitHint": "Tách clip tại đầu phát (Ctrl+B)",
+    "delete": "Xóa",
+    "deleteHint": "Xóa clip đang chọn (Delete)",
+    "addText": "Thêm chữ",
+    "addTextHint": "Thêm chữ tại đầu phát"
+  },
+  "track": {
+    "kind": {
+      "video": "Video",
+      "audio": "Âm thanh",
+      "text": "Chữ",
+      "sticker": "Sticker"
+    },
+    "hide": "Ẩn / hiện track",
+    "mute": "Tắt / bật tiếng",
+    "lock": "Khóa / mở khóa",
+    "remove": "Xóa track",
+    "clipCount_one": "{{count}} clip",
+    "clipCount_other": "{{count}} clip"
+  },
+  "history": {
+    "renameProject": "Đổi tên dự án",
+    "changeSettings": "Đổi cài đặt dự án",
+    "addTrack": "Thêm track",
+    "removeTrack": "Xóa track",
+    "track": {
+      "muted": "Tắt/bật tiếng track",
+      "hidden": "Ẩn/hiện track",
+      "locked": "Khóa/mở khóa track"
+    },
+    "importMedia": "Nhập media",
+    "removeMedia": "Xóa media",
+    "addClip": "Thêm clip vào timeline",
+    "moveClips": "Di chuyển clip",
+    "trimClip": "Cắt clip",
+    "splitClip": "Tách clip",
+    "deleteClips": "Xóa clip",
+    "pasteClips": "Dán clip",
+    "clipSpeed": "Đổi tốc độ clip",
+    "clipVolume": "Đổi âm lượng clip",
+    "clipFade": "Đổi fade clip",
+    "addText": "Thêm chữ",
+    "editText": "Sửa chữ",
+    "textStyle": "Đổi kiểu chữ",
+    "textAnimation": "Đổi hiệu ứng chữ",
+    "transform": "Đổi vị trí / kích thước",
+    "transition": "Đổi chuyển cảnh",
+    "clipColor": "Đổi màu clip",
+    "colorToAll": "Áp màu cho tất cả clip",
+    "relinkMedia": "Tìm lại file media"
+  },
+  "status": {
+    "loading": "Đang tải…",
+    "version": "Phiên bản {{version}}"
+  },
+  "media": {
+    "import": "Nhập",
+    "importing": "Đang nhập…",
+    "filter": {
+      "all": "Tất cả",
+      "video": "Video",
+      "image": "Ảnh",
+      "audio": "Âm thanh"
+    },
+    "dropHint": "Kéo thả video, ảnh, âm thanh vào đây hoặc bấm để chọn file",
+    "formats": "MP4, MOV, MKV, AVI, WEBM, JPG, PNG, HEIC, MP3, WAV, M4A…",
+    "dropHere": "Thả file vào đây để nhập",
+    "loading": "Đang đọc…",
+    "missing": "Không tìm thấy file",
+    "error": "Không đọc được file",
+    "proxyQueued": "Chờ tối ưu…",
+    "proxyRunning": "Đang tối ưu {{percent}}%",
+    "proxyHint": "Đang tạo bản nhẹ để xem trước mượt hơn. Video xuất ra vẫn dùng file gốc.",
+    "proxyError": "Không tối ưu được",
+    "remove": "Xóa khỏi thư viện",
+    "inUse": "Đang được dùng trên timeline – không xóa được",
+    "importErrors_one": "Không nhập được {{count}} file",
+    "importErrors_other": "Không nhập được {{count}} file",
+    "dismiss": "Đóng",
+    "errors": {
+      "unsupported": "định dạng không hỗ trợ",
+      "unreadable": "file hỏng hoặc không đọc được",
+      "missing": "không tìm thấy file",
+      "ffmpeg-missing": "chưa có FFmpeg (chạy: npm run setup:ffmpeg)"
+    },
+    "relink": "Tìm lại",
+    "missingNotice": "Không tìm thấy {{count}} file gốc – bấm \"Tìm lại\" trên thẻ để chọn vị trí mới."
+  },
+  "inspector": {
+    "multiSelected": "Đã chọn {{count}} clip"
+  },
+  "clip": {
+    "track": "Track",
+    "start": "Bắt đầu",
+    "end": "Kết thúc",
+    "duration": "Thời lượng",
+    "sourceIn": "Bắt đầu trong file gốc",
+    "speed": "Tốc độ phát",
+    "resolution": "Độ phân giải",
+    "speedTitle": "Tốc độ",
+    "speedTruncated": "Clip sẽ bị cắt bớt vì chạm clip phía sau",
+    "speedResult": "Đoạn trong file gốc {{source}} → dài {{duration}} trên timeline",
+    "audioTitle": "Âm thanh",
+    "volume": "Âm lượng",
+    "muted": "Tắt tiếng",
+    "fadeIn": "Fade in (to dần)",
+    "fadeOut": "Fade out (nhỏ dần)",
+    "resetHint": "Bấm đúp vào thanh trượt để về mặc định.",
+    "infoTitle": "Thông tin",
+    "locked": "Track đang khóa – mở khóa để chỉnh sửa."
+  },
+  "preview": {
+    "toStart": "Về đầu (Home)",
+    "playPause": "Phát / Dừng (Space)",
+    "toEnd": "Về cuối (End)"
+  },
+  "export": {
+    "title": "Xuất video",
+    "file": "File",
+    "noPath": "Chưa chọn – sẽ hỏi khi bấm Xuất",
+    "choose": "Chọn…",
+    "quality": "Chất lượng",
+    "qualities": {
+      "high": "Cao",
+      "standard": "Tiêu chuẩn",
+      "small": "Nhẹ"
+    },
+    "qualityHint": {
+      "high": "Đẹp nhất, file nặng",
+      "standard": "Cân bằng chất lượng và dung lượng",
+      "small": "File nhẹ, phù hợp gửi qua mạng"
+    },
+    "encoder": "Bộ mã hóa",
+    "auto": "Tự động ({{name}})",
+    "detecting": "Đang kiểm tra GPU…",
+    "encoders": {
+      "h264_nvenc": "GPU NVIDIA (NVENC)",
+      "h264_qsv": "GPU Intel (Quick Sync)",
+      "h264_amf": "GPU AMD (AMF)",
+      "libx264": "CPU (x264)"
+    },
+    "summary": "MP4 H.264 · {{width}} × {{height}} · {{fps}} fps · dài {{duration}}",
+    "cancel": "Hủy",
+    "start": "Xuất",
+    "empty": "Timeline đang trống",
+    "running": "Đang xuất video…",
+    "percent": "Tiến độ",
+    "elapsed": "Đã chạy",
+    "eta": "Còn lại",
+    "speed": "Tốc độ",
+    "backgroundHint": "Bạn có thể chạy nền và tiếp tục chỉnh sửa – video đang xuất không bị ảnh hưởng.",
+    "stop": "Dừng xuất",
+    "runInBackground": "Chạy nền",
+    "done": "Xuất video thành công",
+    "doneDetail": "{{size}} · mất {{time}} · {{encoder}}",
+    "cancelled": "Đã dừng xuất video",
+    "failed": "Xuất video thất bại",
+    "details": "Chi tiết kỹ thuật",
+    "errors": {
+      "empty": "Timeline đang trống, chưa có gì để xuất.",
+      "missing": "Không tìm thấy file gốc: {{files}}",
+      "ffmpeg": "FFmpeg báo lỗi trong lúc xuất. Xem chi tiết bên dưới."
+    },
+    "reveal": "Mở thư mục",
+    "close": "Đóng"
+  },
+  "text": {
+    "title": "Chữ",
+    "placeholder": "Nhập nội dung…",
+    "default": "Nhập chữ của bạn",
+    "styleTitle": "Kiểu chữ",
+    "font": "Font",
+    "size": "Cỡ chữ",
+    "color": "Màu chữ",
+    "bold": "In đậm",
+    "italic": "In nghiêng",
+    "align": {
+      "left": "Căn trái",
+      "center": "Căn giữa",
+      "right": "Căn phải"
+    },
+    "stroke": "Viền chữ",
+    "strokeWidth": "Độ dày viền",
+    "background": "Nền chữ",
+    "animationTitle": "Hiệu ứng",
+    "animationIn": "Xuất hiện",
+    "animationDuration": "Thời gian hiệu ứng",
+    "animations": {
+      "none": "Không có",
+      "fade": "Mờ dần",
+      "slide-up": "Trượt lên",
+      "zoom": "Phóng to",
+      "typewriter": "Gõ chữ"
+    }
+  },
+  "transform": {
+    "title": "Biến đổi",
+    "scale": "Kích thước",
+    "rotation": "Xoay",
+    "opacity": "Độ mờ",
+    "dragHint": "Kéo trên khung Xem trước để đổi vị trí.",
+    "center": "Về giữa"
+  },
+  "transition": {
+    "title": "Chuyển cảnh",
+    "none": "Không",
+    "add": "Thêm chuyển cảnh",
+    "duration": "Thời lượng",
+    "kinds": {
+      "fade": "Mờ dần",
+      "slide-left": "Trượt trái",
+      "slide-right": "Trượt phải",
+      "zoom": "Phóng to"
+    },
+    "hint": "Chuyển cảnh từ clip phía trước vào clip này, nằm giữa mối cắt – độ dài video không đổi."
+  },
+  "color": {
+    "title": "Màu sắc",
+    "filters": "Bộ lọc",
+    "intensity": "Cường độ bộ lọc",
+    "adjust": "Chỉnh màu",
+    "brightness": "Độ sáng",
+    "contrast": "Tương phản",
+    "saturation": "Bão hòa",
+    "reset": "Đặt lại màu",
+    "applyAll": "Áp cho tất cả clip",
+    "appliedAll": "Đã áp cho {{count}} clip",
+    "hoverHint": "Rê chuột lên bộ lọc để xem thử trên khung Xem trước."
+  },
+  "filters": {
+    "none": "Gốc",
+    "vivid": "Rực rỡ",
+    "warm": "Ấm áp",
+    "cool": "Mát lạnh",
+    "bw": "Đen trắng",
+    "vintage": "Cổ điển",
+    "faded": "Phai màu",
+    "dramatic": "Kịch tính",
+    "sunset": "Hoàng hôn"
+  },
+  "start": {
+    "title": "Chào mừng đến với Cutcap",
+    "new": "Dự án mới",
+    "open": "Mở dự án…",
+    "recent": "Dự án gần đây",
+    "noRecent": "Chưa có dự án nào.",
+    "remove": "Bỏ khỏi danh sách",
+    "close": "Đóng",
+    "recoverTitle": "Khôi phục dự án chưa lưu",
+    "recoverText": "Lần trước Cutcap đã bị tắt khi còn thay đổi chưa lưu. Bạn có muốn mở lại bản tự động lưu không?",
+    "recover": "Khôi phục",
+    "discard": "Bỏ qua",
+    "savedAt": "Tự động lưu lúc {{time}}",
+    "neverSaved": "Dự án chưa từng được lưu"
+  }
+}

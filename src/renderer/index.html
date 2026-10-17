@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Chính sách bảo mật: chỉ cho phép tải script/style từ chính ứng dụng.
+         blob:/media: dùng cho video ở các bước sau. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: cutcap-media:; media-src 'self' blob: cutcap-media:; connect-src 'self' cutcap-media: ws:; font-src 'self' data:"
+    />
+    <title>Cutcap</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

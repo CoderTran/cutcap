@@ -37,6 +37,17 @@ export function removeTrack(draft: Project, trackId: Id): void {
   if (index >= 0) draft.tracks.splice(index, 1)
 }
 
+/**
+ * Giống CapCut: track không còn clip nào thì tự biến mất (vd. xóa chữ cuối cùng → track "Chữ 1" mất theo).
+ * Luôn giữ lại track video chính (track video dưới cùng) để timeline không bao giờ trống trơn.
+ */
+export function pruneEmptyTracks(draft: Project): void {
+  const videoTracks = draft.tracks.filter((t) => t.kind === 'video')
+  const mainId = videoTracks[videoTracks.length - 1]?.id
+  if (!draft.tracks.some((t) => t.clips.length === 0 && t.id !== mainId)) return
+  draft.tracks = draft.tracks.filter((t) => t.clips.length > 0 || t.id === mainId)
+}
+
 export function setTrackFlag(
   draft: Project,
   trackId: Id,

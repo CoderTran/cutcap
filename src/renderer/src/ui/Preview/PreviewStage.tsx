@@ -11,13 +11,21 @@ import { editorStore, useEditorStore } from '../../state/editorStore'
 import { attachEngine, pause, togglePlay } from '../../state/playbackActions'
 import { updateSettings } from '../../state/projectActions'
 import { projectStore, useProjectStore } from '../../state/projectStore'
-import { setTransform } from '../../state/textActions'
+import { setTextStyle, setTransform } from '../../state/textActions'
 import { newSession } from '../Inspector/fields'
 import { Icon } from '../icons'
 import { FOCUS_TEXT_EVENT } from '../Inspector/TextPanel'
 
 /** Kéo tới gần giữa khung (theo tỉ lệ khung) thì tự hít vào giữa. */
 const CENTER_SNAP = 0.015
+/** Xoay tới gần 0°/90°/180° (trong khoảng này) thì tự hít vào. */
+const ROTATE_SNAP_DEG = 4
+/** Giới hạn cỡ chữ khi kéo – khớp thanh trượt "Cỡ chữ". */
+const MIN_FONT_SIZE = 8
+const MAX_FONT_SIZE = 300
+
+const SCALE_HANDLES = ['nw', 'ne', 'sw', 'se'] as const
+type HandleKind = (typeof SCALE_HANDLES)[number] | 'rotate'
 
 interface Box {
   left: number
@@ -40,6 +48,9 @@ export function PreviewStage(): React.JSX.Element {
   const duration = useProjectStore((s) => projectDuration(s.project))
   const currentTime = useEditorStore((s) => s.currentTime)
   const playing = useEditorStore((s) => s.playing)
+  // Góc xoay của lớp đang chọn – khung chọn xoay theo (khung do engine trả về là khung CHƯA xoay, cùng tâm)
+  const selectedId = useEditorStore((s) => (s.selectedClipIds.length === 1 ? s.selectedClipIds[0] : null))
+  const selRotation = useProjectStore((s) => (selectedId ? (findClip(s.project, selectedId)?.clip.transform.rotation ?? 0) : 0))
 
   // Tạo engine 1 lần khi khung preview xuất hiện
   useEffect(() => {
@@ -133,6 +144,59 @@ export function PreviewStage(): React.JSX.Element {
     canvas.addEventListener('pointercancel', up)
   }
 
+  /**
+   * Kéo núm trên khung chọn:
+   *   - 4 góc: phóng to / thu nhỏ quanh tâm (chữ → đổi Cỡ chữ, video/ảnh → đổi Tỉ lệ)
+   *   - núm xoay bên dưới: xoay quanh tâm (tự hít vào 0°/90°/180°, giữ Alt để tắt)
+   */
+  const onHandleDown = (handle: HandleKind) => (e: React.PointerEvent<HTMLDivElement>): void => {
+    const canvas = canvasRef.current
+    const selected = editorStore.getState().selectedClipIds
+    if (!canvas || !selBox || e.button !== 0 || selected.length !== 1) return
+    e.stopPropagation()
+    e.preventDefault()
+    const found = findClip(projectStore.getState().project, selected[0])
+    if (!found || found.track.locked) return
+    const { clip } = found
+    pause()
+
+    const rect = canvas.getBoundingClientRect()
+    const center = { x: rect.left + selBox.left + selBox.width / 2, y: rect.top + selBox.top + selBox.height / 2 }
+    const startDist = Math.max(4, Math.hypot(e.clientX - center.x, e.clientY - center.y))
+    const startAngle = Math.atan2(e.clientY - center.y, e.clientX - center.x)
+    const origin = { fontSize: clip.type === 'text' ? clip.style.fontSize : 0, scale: clip.transform.scale, rotation: clip.transform.rotation }
+    const session = newSession(handle === 'rotate' ? 'rotate-layer' : 'scale-layer')
+    const target = e.currentTarget
+    target.setPointerCapture(e.pointerId)
+
+    const move = (ev: PointerEvent): void => {
+      if (handle === 'rotate') {
+        const delta = ((Math.atan2(ev.clientY - center.y, ev.clientX - center.x) - startAngle) * 180) / Math.PI
+        let rotation = Math.round(origin.rotation + delta)
+        rotation = ((((rotation + 180) % 360) + 360) % 360) - 180 // đưa về khoảng -180…180
+        const nearest = Math.round(rotation / 90) * 90
+        if (!ev.altKey && Math.abs(rotation - nearest) <= ROTATE_SNAP_DEG) rotation = nearest
+        setTransform(clip.id, { rotation }, session)
+        return
+      }
+      const factor = Math.hypot(ev.clientX - center.x, ev.clientY - center.y) / startDist
+      if (clip.type === 'text') {
+        const fontSize = Math.round(Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, origin.fontSize * factor)))
+        setTextStyle(clip.id, { fontSize }, session)
+      } else {
+        setTransform(clip.id, { scale: Math.round(origin.scale * factor * 100) / 100 }, session)
+      }
+    }
+    const up = (): void => {
+      target.removeEventListener('pointermove', move)
+      target.removeEventListener('pointerup', up)
+      target.removeEventListener('pointercancel', up)
+    }
+    target.addEventListener('pointermove', move)
+    target.addEventListener('pointerup', up)
+    target.addEventListener('pointercancel', up)
+  }
+
   /** Bấm đúp vào chữ: đưa con trỏ vào ô nhập nội dung ở panel Thuộc tính. */
   const onDoubleClick = (): void => {
     const selected = editorStore.getState().selectedClipIds
@@ -153,7 +217,16 @@ export function PreviewStage(): React.JSX.Element {
             onPointerDown={onPointerDown}
             onDoubleClick={onDoubleClick}
           />
-          {selBox && !playing && <div className="preview-selection" style={selBox} />}
+          {selBox && !playing && (
+            <div className="preview-selection" style={{ ...selBox, transform: selRotation ? `rotate(${selRotation}deg)` : undefined }}>
+              {SCALE_HANDLES.map((h) => (
+                <div key={h} className={`preview-handle ${h}`} title={t('preview.scaleHandle')} onPointerDown={onHandleDown(h)} />
+              ))}
+              <div className="preview-rotate" title={t('preview.rotateHandle')} onPointerDown={onHandleDown('rotate')}>
+                <Icon name="rotate" size={13} />
+              </div>
+            </div>
+          )}
           {guides.x && <div className="preview-guide vertical" />}
           {guides.y && <div className="preview-guide horizontal" />}
         </div>

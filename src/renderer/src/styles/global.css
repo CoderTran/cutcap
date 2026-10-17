@@ -770,6 +770,56 @@ kbd {
   box-shadow: 0 0 0 1px #00000080;
   pointer-events: none;
 }
+/* Núm kéo trên khung chọn: 4 góc để phóng to/thu nhỏ, núm tròn bên dưới để xoay */
+.preview-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px;
+  background: #fff;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #00000060;
+  pointer-events: auto;
+  touch-action: none;
+}
+.preview-handle.nw {
+  left: 0;
+  top: 0;
+  cursor: nwse-resize;
+}
+.preview-handle.se {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+.preview-handle.ne {
+  right: 0;
+  top: 0;
+  cursor: nesw-resize;
+}
+.preview-handle.sw {
+  left: 0;
+  bottom: 0;
+  cursor: nesw-resize;
+}
+.preview-rotate {
+  position: absolute;
+  left: 50%;
+  bottom: -32px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  color: #111;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #00000060;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
 .preview-guide {
   position: absolute;
   background: var(--warn);

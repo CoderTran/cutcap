@@ -61,7 +61,11 @@ export class PreviewEngine {
       mediaStore.subscribe(() => this.requestRender()),
       editorStore.subscribe((s, prev) => {
         // Đổi clip đang chọn → vẽ lại khung chọn trên preview
-        if (s.selectedClipIds !== prev.selectedClipIds) this.layoutListener?.(this.layout)
+        // (vẽ lại luôn: chữ đang chọn được hiện đầy đủ, bỏ qua hiệu ứng xuất hiện)
+        if (s.selectedClipIds !== prev.selectedClipIds) {
+          this.layoutListener?.(this.layout)
+          this.requestRender()
+        }
         if (s.filterPreview !== prev.filterPreview) this.requestRender()
         if (s.currentTime === prev.currentTime) return
         // Người dùng tự tua (bấm thước, phím mũi tên) trong lúc đang phát → đặt lại mốc đồng hồ
@@ -246,10 +250,13 @@ export class PreviewEngine {
     ctx.fillRect(0, 0, W, H)
 
     const layout: LayerBox[] = []
+    const selected = editorStore.getState().selectedClipIds
     for (const layer of visualLayersAt(project, t)) {
       const { clip, asset } = layer
       if (clip.type === 'text') {
-        const rect = drawTextClip(ctx, clip, W, H, t)
+        // Đang dừng và đang chọn chữ → hiện chữ đầy đủ (bỏ qua hiệu ứng xuất hiện) để dễ chỉnh sửa
+        const editing = !this.playing && clip.animationIn !== 'none' && selected.includes(clip.id)
+        const rect = drawTextClip(ctx, editing ? { ...clip, animationIn: 'none' } : clip, W, H, t)
         if (rect) layout.push({ clipId: clip.id, rect })
         continue
       }

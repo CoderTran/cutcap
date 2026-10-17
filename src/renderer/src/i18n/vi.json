@@ -94,7 +94,8 @@
     "colorToAll": "Áp màu cho tất cả clip",
     "relinkMedia": "Tìm lại file media",
     "trimLeft": "Xóa phần bên trái",
-    "trimRight": "Xóa phần bên phải"
+    "trimRight": "Xóa phần bên phải",
+    "removeEmptyText": "Xóa chữ trống"
   },
   "status": {
     "loading": "Đang tải…",
@@ -177,7 +178,9 @@
     "toStart": "Về đầu (Home)",
     "playPause": "Phát / Dừng (Space)",
     "toEnd": "Về cuối (End)",
-    "fullscreen": "Toàn màn hình (Esc để thoát)"
+    "fullscreen": "Toàn màn hình (Esc để thoát)",
+    "scaleHandle": "Kéo để phóng to / thu nhỏ (chữ: đổi cỡ chữ)",
+    "rotateHandle": "Kéo để xoay (giữ Alt để tắt hít góc)"
   },
   "export": {
     "title": "Xuất video",

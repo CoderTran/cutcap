@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyProject } from '@shared/project/factory'
 import * as ops from '@shared/project/ops'
+import { createTextClip } from '@shared/timeline/clips'
+import { deleteClips } from '@shared/timeline/edit'
 import { createProjectStore, selectIsDirty } from '../src/renderer/src/state/projectStore'
 
 function setup() {
@@ -16,7 +18,7 @@ describe('projectStore', () => {
     const store = setup()
     const s = () => store.getState()
 
-    s().apply('history.addTrack', (d) => void ops.addTrack(d, 'audio'))
+    s().apply('history.renameProject', (d) => ops.renameProject(d, 'Mới'))
     expect(selectIsDirty(s())).toBe(true)
 
     s().markSaved('C:\\test.cutcap', '2026-01-01T00:00:00.000Z')
@@ -25,11 +27,26 @@ describe('projectStore', () => {
 
     s().undo()
     expect(selectIsDirty(s())).toBe(true)
-    expect(s().project.tracks).toHaveLength(1)
+    expect(s().project.name).toBe('Test')
 
     s().redo()
     expect(selectIsDirty(s())).toBe(false)
-    expect(s().project.tracks).toHaveLength(2)
+    expect(s().project.name).toBe('Mới')
+  })
+
+  it('track hết clip thì tự biến mất (giữ track video chính); Undo trả lại cả track', () => {
+    const store = setup()
+    const s = () => store.getState()
+    const text = createTextClip(0, 'Xin chào')
+    s().apply('add', (d) => ops.addClip(d, ops.addTrack(d, 'text'), text))
+    expect(s().project.tracks.map((t) => t.kind)).toEqual(['text', 'video'])
+
+    s().apply('del', (d) => deleteClips(d, [text.id]))
+    expect(s().project.tracks.map((t) => t.kind)).toEqual(['video']) // "Chữ 1" mất theo, "Video 1" (chính) ở lại
+
+    s().undo()
+    expect(s().project.tracks.map((t) => t.kind)).toEqual(['text', 'video'])
+    expect(s().project.tracks[0].clips).toHaveLength(1)
   })
 
   it('không gộp thao tác vào bước đã lưu', () => {
@@ -53,10 +70,18 @@ describe('projectStore', () => {
   })
 
   it('track mới: video/chữ lên trên cùng, âm thanh xuống dưới cùng', () => {
-    const store = setup()
-    const s = () => store.getState()
-    s().apply('a', (d) => void ops.addTrack(d, 'audio'))
-    s().apply('t', (d) => void ops.addTrack(d, 'text'))
-    expect(s().project.tracks.map((t) => t.kind)).toEqual(['text', 'video', 'audio'])
+    const project = createEmptyProject('Test')
+    ops.addTrack(project, 'audio')
+    ops.addTrack(project, 'text')
+    expect(project.tracks.map((t) => t.kind)).toEqual(['text', 'video', 'audio'])
+  })
+
+  it('dọn track trống: chỉ giữ track video dưới cùng', () => {
+    const project = createEmptyProject('Test')
+    ops.addTrack(project, 'video')
+    ops.addTrack(project, 'audio')
+    const mainId = project.tracks[1].id // track video có sẵn, giờ nằm dưới track video mới
+    ops.pruneEmptyTracks(project)
+    expect(project.tracks.map((t) => t.id)).toEqual([mainId])
   })
 })

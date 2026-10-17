@@ -8,6 +8,7 @@
 import type { Draft } from 'immer'
 import { createStore, useStore } from 'zustand'
 import { createEmptyProject } from '@shared/project/factory'
+import { pruneEmptyTracks } from '@shared/project/ops'
 import type { Project } from '@shared/project/schema'
 import {
   commit,
@@ -56,7 +57,12 @@ export function createProjectStore(initial: Project = createEmptyProject('')) {
 
     apply(label, recipe, options) {
       const { project, history, savedEntryId } = get()
-      const result = commit(project, history, label, recipe, { ...options, protectedId: savedEntryId })
+      // Sau mỗi thay đổi: dọn các track đã trống (nằm chung một bước Undo với thay đổi đó)
+      const withPrune = (d: Draft<Project>): void => {
+        recipe(d)
+        pruneEmptyTracks(d)
+      }
+      const result = commit(project, history, label, withPrune, { ...options, protectedId: savedEntryId })
       if (result.state !== project) set({ project: result.state, history: result.history })
     },
 

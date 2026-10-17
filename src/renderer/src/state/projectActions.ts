@@ -1,7 +1,7 @@
 // Các lệnh chỉnh sửa mà giao diện gọi. Mỗi lệnh = 1 bước Undo, có nhãn để hiện tooltip.
 // Logic sửa dữ liệu thật sự nằm ở @shared/project/ops (hàm thuần, dễ test).
 import * as ops from '@shared/project/ops'
-import type { Id, ProjectSettings, TrackKind } from '@shared/project/schema'
+import type { Id, ProjectSettings } from '@shared/project/schema'
 import { projectStore } from './projectStore'
 
 const apply = (...args: Parameters<ReturnType<typeof projectStore.getState>['apply']>): void =>
@@ -13,12 +13,6 @@ export function renameProject(name: string): void {
 
 export function updateSettings(changes: Partial<ProjectSettings>): void {
   apply('history.changeSettings', (d) => ops.updateSettings(d, changes))
-}
-
-export function addTrack(kind: TrackKind): void {
-  apply('history.addTrack', (d) => {
-    ops.addTrack(d, kind)
-  })
 }
 
 export function removeTrack(trackId: Id): void {

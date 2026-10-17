@@ -103,6 +103,19 @@ export function deleteSelected(): void {
   editorStore.getState().clearSelection()
 }
 
+/**
+ * Clip chữ bị xóa hết nội dung rồi bỏ chọn → tự xóa luôn clip đó (giống CapCut),
+ * để không còn khung chữ trống "vô hình" trên timeline.
+ */
+export function removeEmptyTexts(clipIds: Id[]): void {
+  const p = project()
+  const ids = editableClipIds(p, clipIds).filter((id) => {
+    const clip = p.tracks.flatMap((t) => t.clips).find((c) => c.id === id)
+    return clip?.type === 'text' && clip.text.trim() === ''
+  })
+  if (ids.length > 0) apply('history.removeEmptyText', (d) => deleteClips(d, ids))
+}
+
 export function copySelected(): void {
   const ids = editorStore.getState().selectedClipIds
   if (ids.length > 0) editorStore.getState().setClipboard(copyClips(project(), ids))

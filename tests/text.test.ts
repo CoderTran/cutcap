@@ -43,9 +43,10 @@ describe('bố cục & hiệu ứng chữ', () => {
   })
 
   it('số khung hiệu ứng khi xuất', () => {
-    const clip = createTextClip(0, 'x') // fade 0.5s, dài 3s
+    const clip = { ...createTextClip(0, 'x'), animationIn: 'fade' as const } // fade 0.5s, dài 3s
     expect(animationFrameCount(clip, 30)).toBe(15)
     expect(animationFrameCount({ ...clip, animationIn: 'none' }, 30)).toBe(0)
+    expect(createTextClip(0, 'x').animationIn).toBe('none') // chữ mới: không hiệu ứng (giống CapCut)
     expect(animationFrameCount({ ...clip, duration: 0.2 * S }, 30)).toBe(6) // không dài hơn clip
   })
 })

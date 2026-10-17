@@ -15,7 +15,8 @@ import { startExportSync } from '../state/exportStore'
 import { handleCloseRequest, openProjectPath } from '../state/fileActions'
 import { startMediaSync } from '../state/mediaActions'
 import { projectStore, selectIsDirty, useProjectStore } from '../state/projectStore'
-import { pruneSelection } from '../state/timelineActions'
+import { editorStore } from '../state/editorStore'
+import { pruneSelection, removeEmptyTexts } from '../state/timelineActions'
 import { ExportDialog } from '../ui/Export/ExportDialog'
 import { HomeScreen } from '../ui/Home/HomeScreen'
 import { Inspector } from '../ui/Inspector/Inspector'
@@ -59,6 +60,17 @@ export function App(): React.JSX.Element {
     () =>
       projectStore.subscribe((s, prev) => {
         if (s.project.tracks !== prev.project.tracks) pruneSelection()
+      }),
+    []
+  )
+
+  // Bỏ chọn một clip chữ đã bị xóa hết nội dung → xóa luôn clip đó
+  useEffect(
+    () =>
+      editorStore.subscribe((s, prev) => {
+        if (s.selectedClipIds === prev.selectedClipIds) return
+        const left = prev.selectedClipIds.filter((id) => !s.selectedClipIds.includes(id))
+        if (left.length > 0) removeEmptyTexts(left)
       }),
     []
   )

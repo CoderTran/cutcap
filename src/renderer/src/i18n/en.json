@@ -94,7 +94,8 @@
     "colorToAll": "Apply color to all clips",
     "relinkMedia": "Relink media",
     "trimLeft": "Delete left part",
-    "trimRight": "Delete right part"
+    "trimRight": "Delete right part",
+    "removeEmptyText": "Remove empty text"
   },
   "status": {
     "loading": "Loading…",
@@ -177,7 +178,9 @@
     "toStart": "Go to start (Home)",
     "playPause": "Play / Pause (Space)",
     "toEnd": "Go to end (End)",
-    "fullscreen": "Fullscreen (Esc to exit)"
+    "fullscreen": "Fullscreen (Esc to exit)",
+    "scaleHandle": "Drag to resize (text: changes font size)",
+    "rotateHandle": "Drag to rotate (hold Alt to disable angle snapping)"
   },
   "export": {
     "title": "Export video",

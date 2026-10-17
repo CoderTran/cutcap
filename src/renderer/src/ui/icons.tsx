@@ -42,7 +42,8 @@ const PATHS = {
   play: 'M7 5v14l12-7z',
   pause: 'M7 5h3v14H7zm7 0h3v14h-3z',
   fullscreen: 'M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5',
-  ratio: 'M4 6h16v12H4zm4 4h8'
+  ratio: 'M4 6h16v12H4zm4 4h8',
+  rotate: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4'
 } as const
 
 export type IconName = keyof typeof PATHS

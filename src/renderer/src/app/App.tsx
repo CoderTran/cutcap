@@ -12,11 +12,13 @@ import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../state/appStore'
 import { startAutosave } from '../state/autosave'
 import { startExportSync } from '../state/exportStore'
+import { loadFavorites } from '../state/favoritesStore'
 import { handleCloseRequest, openProjectPath } from '../state/fileActions'
 import { startMediaSync } from '../state/mediaActions'
 import { projectStore, selectIsDirty, useProjectStore } from '../state/projectStore'
 import { editorStore } from '../state/editorStore'
 import { pruneSelection, removeEmptyTexts } from '../state/timelineActions'
+import { CoverDialog } from '../ui/Cover/CoverDialog'
 import { ExportDialog } from '../ui/Export/ExportDialog'
 import { HomeScreen } from '../ui/Home/HomeScreen'
 import { Inspector } from '../ui/Inspector/Inspector'
@@ -32,6 +34,9 @@ function useWindowState(): void {
   const name = useProjectStore((s) => s.project.name)
   const dirty = useProjectStore(selectIsDirty)
   const view = useAppStore((s) => s.view)
+
+  // Yêu thích (★): nạp 1 lần khi mở app
+  useEffect(() => void loadFavorites(), [])
 
   useEffect(() => {
     document.title = view === 'home' ? 'Cutcap' : `${dirty ? '● ' : ''}${name || t('project.untitled')} – Cutcap`
@@ -91,6 +96,7 @@ export function App(): React.JSX.Element {
       <TitleBar mode={view} />
       {view === 'home' ? <HomeScreen /> : <EditorWorkspace />}
       <ExportDialog />
+      <CoverDialog />
     </div>
   )
 }

@@ -2,7 +2,8 @@
 // `session`: mã của một lần kéo thanh trượt – mọi thay đổi trong cùng một lần kéo gộp thành 1 bước Undo.
 import type { Id, TransitionKind } from '@shared/project/schema'
 import type { Micros } from '@shared/project/time'
-import { applyColor, applyColorToAll, applyFades, applySpeed, applyVolume, type ColorChanges } from '@shared/timeline/clipProps'
+import { applyColor, applyColorToAll, applyFades, applySpeed, applySpeedCurve, applyVolume, type ColorChanges } from '@shared/timeline/clipProps'
+import type { SpeedCurve } from '@shared/timeline/speedCurve'
 import { applyTransition } from '@shared/timeline/transitions'
 import { findClip } from '@shared/timeline/clips'
 import { editTimeFor } from './keyframeActions'
@@ -17,6 +18,13 @@ export function setClipSpeed(clipId: Id, speed: number, session?: string): void 
   projectStore
     .getState()
     .apply('history.clipSpeed', (d) => applySpeed(d, clipId, speed, minClipDuration()), coalesce(session))
+}
+
+/** Tốc độ → Uốn cong: đặt đường cong (null = bỏ, về tốc độ đều). Một lần kéo điểm = 1 bước Undo. */
+export function setClipSpeedCurve(clipId: Id, curve: SpeedCurve | null, session?: string): void {
+  projectStore
+    .getState()
+    .apply('history.speedCurve', (d) => void applySpeedCurve(d, clipId, curve, minClipDuration()), coalesce(session))
 }
 
 export function setClipVolume(clipId: Id, volume: number, session?: string): void {

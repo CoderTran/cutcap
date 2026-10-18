@@ -1,5 +1,6 @@
 // Các mục thuộc tính của clip media (Inspector ghép chúng thành các tab kiểu CapCut):
 // Tốc độ, Âm thanh (âm lượng, fade), Thông tin.
+import { sourceSpanOf } from '@shared/timeline/clipTime'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { isKaraokeFile } from '@shared/media/derived'
@@ -37,7 +38,7 @@ export function SpeedSection({ clip, disabled }: { clip: MediaClip; disabled: bo
   const fps = useProjectStore((s) => s.project.settings.fps)
   // Thử trước từng mức tốc độ: mức nào làm clip đè lên clip phía sau thì cảnh báo trên nút
   const preview = (speed: number) => planSpeed(projectStore.getState().project, clip.id, speed, minClipDuration())
-  const sourceSpanUs = clip.duration * clip.speed
+  const sourceSpanUs = sourceSpanOf(clip)
 
   return (
     <section className="inspector-section">

@@ -4,6 +4,7 @@
 import type { TextFrameSet } from '@shared/ipc'
 import type { Project } from '@shared/project/schema'
 import { MICROS_PER_SECOND } from '@shared/project/time'
+import { textAnimSpans } from '@shared/render/textAnims'
 import { animationFrameCount } from '@shared/render/textLayout'
 import { clipEnd } from '@shared/timeline/clips'
 import { hasKeyframes } from '@shared/timeline/keyframes'
@@ -33,7 +34,7 @@ export async function renderTextFrames(project: Project, width: number, height: 
       }
       // Khung tĩnh cho phần còn lại: sau khi hiệu ứng chạy xong (chữ có keyframe: khung cuối của clip)
       ctx.clearRect(0, 0, width, height)
-      const stillAt = hasKeyframes(clip) ? clipEnd(clip) - 1 : clip.start + clip.animationDuration
+      const stillAt = hasKeyframes(clip) ? clipEnd(clip) - 1 : clip.start + textAnimSpans(clip).inUs
       drawTextClip(ctx, clip, width, height, stillAt)
       sets.push({ clipId: clip.id, animated, still: await toPng(canvas) })
     }

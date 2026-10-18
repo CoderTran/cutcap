@@ -14,6 +14,7 @@ export function addEffectAtPlayhead(effectId: string): Id {
   const { project, apply } = projectStore.getState()
   const start = editorStore.getState().currentTime
   const clip = createEffectClip(start, effectId)
+  editorStore.getState().setTilePreview(null)
   const free = project.tracks.find((t) => t.kind === 'effect' && !t.locked && canPlace(t, start, DEFAULT_EFFECT_DURATION))
   apply('history.addEffect', (d) => ops.addClip(d, free?.id ?? ops.addTrack(d, 'effect'), clip))
   editorStore.getState().setSelection([clip.id])

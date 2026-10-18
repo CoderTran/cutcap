@@ -14,6 +14,7 @@ import {
   paste,
   selectAll,
   splitAtPlayhead,
+  toggleMagnet,
   trimAtPlayhead
 } from '../state/timelineActions'
 
@@ -38,6 +39,7 @@ const SHORTCUTS: Shortcut[] = [
   { keys: 'Ctrl+B', run: splitAtPlayhead },
   { keys: 'Q', run: () => trimAtPlayhead('left') },
   { keys: 'W', run: () => trimAtPlayhead('right') },
+  { keys: 'N', run: toggleMagnet },
   { keys: 'Delete', run: deleteSelected },
   { keys: 'Backspace', run: deleteSelected },
   { keys: 'Ctrl+C', run: copySelected },

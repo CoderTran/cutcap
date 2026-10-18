@@ -1,12 +1,14 @@
 // Panel chỉnh clip chữ: nội dung, font, cỡ, màu, kiểu, viền, nền, hiệu ứng xuất hiện, biến đổi.
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TEXT_ANIMATIONS, type TextAnimation, type TextClip, type TextStyle, type Track } from '@shared/project/schema'
-import { MICROS_PER_SECOND } from '@shared/project/time'
-import { setText, setTextAnimation, setTextStyle } from '../../state/textActions'
+import type { TextClip, TextStyle, Track } from '@shared/project/schema'
+import { setText, setTextStyle } from '../../state/textActions'
 import { ColorField, newSession, useSystemFonts } from './fields'
 import { SliderField } from './SliderField'
+import { TextAnimPanel } from './TextAnimPanel'
 import { TransformSection } from './TransformSection'
+import { TEXT_STYLE_PRESETS, type TextStylePreset } from '@shared/render/textFx'
+import { textFxThumb } from '../textFxThumb'
 
 /** Sự kiện: bấm đúp vào chữ trên preview → đưa con trỏ vào ô nhập nội dung. */
 export const FOCUS_TEXT_EVENT = 'cutcap:focus-text'
@@ -144,44 +146,48 @@ export function TextPanel({ clip, track, section }: { clip: TextClip; track: Tra
         </div>
       </section>
 
+      <TextFxSection clip={clip} disabled={disabled} />
       </>
       )}
 
-      {section === 'animation' && (
-      <section className="inspector-section">
-        <h4>{t('text.animationTitle')}</h4>
-        <label className="field">
-          <span>{t('text.animationIn')}</span>
-          <select
-            value={clip.animationIn}
-            disabled={disabled}
-            onChange={(e) => setTextAnimation(clip.id, e.target.value as TextAnimation, clip.animationDuration)}
-          >
-            {TEXT_ANIMATIONS.map((a) => (
-              <option key={a} value={a}>
-                {t(`text.animations.${a}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        {clip.animationIn !== 'none' && (
-          <SliderField
-            label={t('text.animationDuration')}
-            display={`${(clip.animationDuration / MICROS_PER_SECOND).toFixed(1)}s`}
-            value={clip.animationDuration}
-            min={100_000}
-            max={3_000_000}
-            step={100_000}
-            disabled={disabled}
-            onChange={(v, s) => setTextAnimation(clip.id, clip.animationIn, v, s)}
-            onReset={() => setTextAnimation(clip.id, clip.animationIn, 500_000)}
-          />
-        )}
-      </section>
-
-      )}
+      {section === 'animation' && <TextAnimPanel clip={clip} disabled={disabled} />}
 
       {section === 'text' && <TransformSection clip={clip} disabled={disabled} />}
     </div>
+  )
+}
+
+/**
+ * Hiệu ứng văn bản cho chữ ĐANG CHỌN (giống CapCut): bấm một ô → đổi kiểu chữ (màu, viền, phát sáng, khung…),
+ * giữ nguyên nội dung, cỡ chữ, căn lề. Ô đầu tiên: bỏ hiệu ứng.
+ */
+function TextFxSection({ clip, disabled }: { clip: TextClip; disabled: boolean }): React.JSX.Element {
+  const { t } = useTranslation()
+  const apply = (p: TextStylePreset | null): void => {
+    if (!p) return setTextStyle(clip.id, { fx: null })
+    const { fontSize: _keep, align: _keepAlign, ...rest } = p.style
+    setTextStyle(clip.id, { ...rest, fx: p.style.fx ?? null })
+  }
+  const fxPresets = TEXT_STYLE_PRESETS.filter((p) => p.category !== 'basic')
+  const current = clip.style.fx ? JSON.stringify(clip.style.fx) : null
+  return (
+    <section className="inspector-section">
+      <h4>{t('textFx.title')}</h4>
+      <div className="preset-grid text-fx-grid">
+        <button className={`preset-tile ${!clip.style.fx ? 'active' : ''}`} disabled={disabled} onClick={() => apply(null)} title={t('textFx.none')}>
+          <span className="preset-thumb text-fx-thumb text-fx-none">{t('textFx.none')}</span>
+        </button>
+        {fxPresets.map((p) => (
+          <button
+            key={p.id}
+            className={`preset-tile ${current && current === JSON.stringify(p.style.fx) ? 'active' : ''}`}
+            disabled={disabled}
+            onClick={() => apply(p)}
+          >
+            <img className="preset-thumb text-fx-thumb" src={textFxThumb(p)} alt="" draggable={false} />
+          </button>
+        ))}
+      </div>
+    </section>
   )
 }

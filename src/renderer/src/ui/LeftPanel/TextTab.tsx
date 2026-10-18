@@ -1,52 +1,15 @@
-// Tab Văn bản: các mẫu chữ có sẵn (bấm vào mẫu → thêm chữ tại đầu phát) và Phụ đề tự động.
-import { useState } from 'react'
+// Tab Văn bản: mẫu chữ / hiệu ứng văn bản theo nhóm (bấm 1 lần → xem thử, bấm đúp / + → thêm tại đầu phát)
+// và Phụ đề tự động.
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { TextAnimation, TextStyle } from '@shared/project/schema'
-import { addTextAtPlayhead } from '../../state/textActions'
-import { Icon } from '../icons'
+import { TEXT_STYLE_CATEGORIES, TEXT_STYLE_PRESETS, presetsIn, type TextStyleCategory, type TextStylePreset } from '@shared/render/textFx'
+import { editorStore } from '../../state/editorStore'
+import { addTextAtPlayhead, textClipFromPreset } from '../../state/textActions'
+import { useFavorites } from '../../state/favoritesStore'
+import { FavoriteFilter, FavoriteStar } from '../Favorites'
+import { textFxThumb } from '../textFxThumb'
+import { TileAdd } from '../TileAdd'
 import { CaptionPanel } from './CaptionPanel'
-
-interface TextPreset {
-  id: string
-  style: Partial<TextStyle>
-  animationIn?: TextAnimation
-}
-
-/** Mẫu chữ. Thêm mẫu mới: thêm 1 mục ở đây + tên trong file ngôn ngữ (textPresets.<id>). */
-const PRESETS: TextPreset[] = [
-  { id: 'default', style: {} },
-  { id: 'title', style: { fontSize: 140, strokeWidth: 0, strokeColor: null }, animationIn: 'zoom' },
-  {
-    id: 'subtitle',
-    style: { fontSize: 56, bold: false, strokeColor: null, strokeWidth: 0, backgroundColor: '#000000' },
-    animationIn: 'none'
-  },
-  { id: 'yellow', style: { color: '#ffd400', strokeColor: '#000000', strokeWidth: 6 } },
-  { id: 'red', style: { color: '#ff3b3b', strokeColor: '#ffffff', strokeWidth: 5 } },
-  { id: 'boxed', style: { color: '#111111', strokeColor: null, strokeWidth: 0, backgroundColor: '#ffffff' } },
-  {
-    id: 'elegant',
-    style: { fontFamily: 'Times New Roman', bold: false, italic: true, strokeColor: null, strokeWidth: 0 },
-    animationIn: 'fade'
-  },
-  { id: 'neon', style: { color: '#ffffff', strokeColor: '#22c3e6', strokeWidth: 6 }, animationIn: 'typewriter' }
-]
-
-/** Mô phỏng kiểu chữ bằng CSS cho ô xem trước (chữ thật do drawText vẽ trên preview). */
-function previewCss(style: Partial<TextStyle>): React.CSSProperties {
-  const stroke = style.strokeColor !== null && (style.strokeWidth ?? 4) > 0 ? (style.strokeColor ?? '#000000') : null
-  return {
-    fontFamily: `"${style.fontFamily ?? 'Segoe UI'}", sans-serif`,
-    fontWeight: style.bold === false ? 400 : 700,
-    fontStyle: style.italic ? 'italic' : 'normal',
-    color: style.color ?? '#ffffff',
-    background: style.backgroundColor ?? 'transparent',
-    padding: style.backgroundColor ? '0 6px' : 0,
-    borderRadius: 3,
-    WebkitTextStroke: stroke ? `1px ${stroke}` : undefined,
-    paintOrder: 'stroke fill'
-  }
-}
 
 export function TextTab(): React.JSX.Element {
   const { t } = useTranslation()
@@ -68,26 +31,69 @@ export function TextTab(): React.JSX.Element {
 
 function PresetGrid(): React.JSX.Element {
   const { t } = useTranslation()
+  const [onlyFavs, setOnlyFavs] = useState(false)
+  const [category, setCategory] = useState<TextStyleCategory | 'all'>('all')
+  const [picked, setPicked] = useState<string | null>(null)
+  const favs = useFavorites('text')
+  // Rời danh sách mẫu → bỏ bản xem thử
+  useEffect(() => () => editorStore.getState().setTilePreview(null), [])
+  /** Bấm 1 lần: chọn + xem thử trên khung Xem trước (bấm lại = bỏ chọn). */
+  const pick = (p: TextStylePreset): void => {
+    const off = picked === p.id
+    setPicked(off ? null : p.id)
+    editorStore.getState().setTilePreview(off ? null : { kind: 'clip', clip: textClipFromPreset(t('text.default'), 0, p) })
+  }
+  const add = (p: TextStylePreset): void => {
+    setPicked(null)
+    addTextAtPlayhead(t('text.default'), p)
+  }
+
+  const sections: { key: string; title: string; items: TextStylePreset[] }[] = onlyFavs
+    ? [
+        {
+          key: 'favorites',
+          title: `★ ${t('favorites.title')}`,
+          items: favs.map((id) => TEXT_STYLE_PRESETS.find((p) => p.id === id)).filter((p): p is TextStylePreset => !!p)
+        }
+      ]
+    : (category === 'all' ? TEXT_STYLE_CATEGORIES : [category]).map((c) => ({ key: c, title: t(`textFx.categories.${c}`), items: presetsIn(c) }))
+
   return (
     <>
-      <div className="preset-grid">
-        {PRESETS.map((p) => (
-          <button
-            key={p.id}
-            className="preset-tile"
-            onClick={() => addTextAtPlayhead(t('text.default'), p)}
-            title={t('textPresets.addHint')}
-          >
-            <span className="preset-sample">
-              <span style={previewCss(p.style)}>{t('textPresets.sample')}</span>
-            </span>
-            <span className="preset-name">{t(`textPresets.${p.id}`)}</span>
-            <span className="tile-add">
-              <Icon name="plus" size={14} />
-            </span>
-          </button>
+      <FavoriteFilter only={onlyFavs} count={favs.length} onChange={setOnlyFavs} />
+      {!onlyFavs && (
+        <div className="chip-row">
+          {(['all', ...TEXT_STYLE_CATEGORIES] as const).map((c) => (
+            <button key={c} className={`chip ${category === c ? 'active' : ''}`} onClick={() => setCategory(c)}>
+              {t(`textFx.categories.${c}`)}
+            </button>
+          ))}
+        </div>
+      )}
+      {onlyFavs && sections[0].items.length === 0 && <p className="hint">{t('favorites.empty')}</p>}
+      {sections
+        .filter((sec) => sec.items.length > 0)
+        .map((sec) => (
+          <section key={sec.key} className="effect-group">
+            <h3 className="left-heading">{sec.title}</h3>
+            <div className="preset-grid text-fx-grid">
+              {sec.items.map((p) => (
+                <button
+                  key={p.id}
+                  className={`preset-tile ${picked === p.id ? 'active' : ''}`}
+                  // Bấm 1 lần: chọn ô + xem thử; bấm đúp hoặc bấm + : thêm chữ (giống CapCut)
+                  onClick={() => pick(p)}
+                  onDoubleClick={() => add(p)}
+                  title={p.category === 'basic' ? t(`textPresets.${p.id}`) : t('textPresets.addHint')}
+                >
+                  <img className="preset-thumb text-fx-thumb" src={textFxThumb(p)} alt="" draggable={false} />
+                  <FavoriteStar kind="text" id={p.id} />
+                  <TileAdd title={t('textPresets.addHint')} onAdd={() => add(p)} />
+                </button>
+              ))}
+            </div>
+          </section>
         ))}
-      </div>
     </>
   )
 }

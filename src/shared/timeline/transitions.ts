@@ -7,6 +7,7 @@
 //   - âm thanh vẫn cắt gọn tại mối cắt
 // Dữ liệu lưu ở clip SAU: clip.transitionIn = { kind, duration }.
 // Preview và engine xuất video cùng dùng file này → hiệu ứng giống nhau.
+import { sourceTimeAt } from './clipTime'
 import type { Id, MediaAsset, MediaClip, Project, Track, TransitionKind } from '../project/schema'
 import type { Micros } from '../project/time'
 import { clipEnd, findClip } from './clips'
@@ -105,7 +106,7 @@ export function transitionEffect(kind: TransitionKind, role: 'in' | 'out', p: nu
  * Cần khi chuyển cảnh kéo clip ra ngoài đoạn đã cắt.
  */
 export function clampedSourceTime(clip: MediaClip, asset: MediaAsset, t: Micros): { time: Micros; frozen: boolean } {
-  const raw = Math.round(clip.sourceIn + (t - clip.start) * clip.speed)
+  const raw = sourceTimeAt(clip, t)
   // Khung cuối: lùi 40ms khỏi điểm kết thúc để trình phát/FFmpeg chắc chắn có hình
   const max = Math.max(0, asset.durationUs - 40_000)
   const time = clamp(raw, 0, max)

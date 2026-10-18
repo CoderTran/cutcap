@@ -1,12 +1,12 @@
 // Thanh công cụ timeline kiểu CapCut:
 //   trái:  Hoàn tác · Làm lại | Tách (Ctrl+B) · Xóa trái (Q) · Xóa phải (W) · Xóa (Delete)
-//   phải:  Nam châm (hít) | Thu nhỏ · thanh zoom · Phóng to · Vừa khung
+//   phải:  Hút vào đoạn chính (N) · Nam châm (hít) | Thu nhỏ · thanh zoom · Phóng to · Vừa khung
 import { useTranslation } from 'react-i18next'
 import { MAX_PX_PER_SECOND, MIN_PX_PER_SECOND } from '@shared/timeline/ruler'
 import { editorStore, useEditorStore } from '../../state/editorStore'
 import { redo, undo } from '../../state/projectActions'
 import { selectCanRedo, selectCanUndo, selectRedoLabel, selectUndoLabel, useProjectStore } from '../../state/projectStore'
-import { deleteSelected, splitAtPlayhead, trimAtPlayhead } from '../../state/timelineActions'
+import { deleteSelected, splitAtPlayhead, toggleMagnet, trimAtPlayhead } from '../../state/timelineActions'
 import { Icon, type IconName } from '../icons'
 
 // Thanh trượt zoom dùng thang logarit: mỗi nấc tăng/giảm theo tỉ lệ, cảm giác đều tay hơn
@@ -34,6 +34,7 @@ export function TimelineToolbar({ durationUs, onZoom, onFit }: Props): React.JSX
   const { t } = useTranslation()
   const pps = useEditorStore((s) => s.pxPerSecond)
   const snapping = useEditorStore((s) => s.snapping)
+  const magnet = useEditorStore((s) => s.magnet)
   const hasSelection = useEditorStore((s) => s.selectedClipIds.length > 0)
   const canUndo = useProjectStore(selectCanUndo)
   const canRedo = useProjectStore(selectCanRedo)
@@ -53,6 +54,12 @@ export function TimelineToolbar({ durationUs, onZoom, onFit }: Props): React.JSX
         <ToolButton icon="trash" onClick={deleteSelected} disabled={!hasSelection} title={t('timeline.deleteHint')} />
       </div>
       <div className="tl-zoom">
+        <ToolButton
+          icon="autoAttach"
+          onClick={toggleMagnet}
+          active={magnet}
+          title={t(magnet ? 'timeline.magnetOff' : 'timeline.magnetOn')}
+        />
         <ToolButton icon="magnet" onClick={() => editorStore.getState().toggleSnapping()} active={snapping} title={t('timeline.snapHint')} />
         <span className="tool-sep" />
         <ToolButton icon="zoomOut" onClick={() => onZoom(pps / 1.5)} title={t('timeline.zoomOut')} />

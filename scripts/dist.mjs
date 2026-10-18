@@ -24,6 +24,7 @@ for (const [file, hint] of [
   ['resources/ffmpeg/ffmpeg-build.json', 'npm run setup:ffmpeg'],
   ['resources/whisper/whisper-cli.exe', 'npm run setup:whisper'],
   ['resources/whisper/whisper-build.json', 'npm run setup:whisper'],
+  ['src/renderer/public/mediapipe/face_landmarker.task', 'npm run setup:face'],
   ['build/icon.png', 'npm run icons'],
   ['build/file-icon.ico', 'npm run icons'],
   ['LICENSE', 'chép LICENSE (GPL-3.0) vào thư mục dự án']

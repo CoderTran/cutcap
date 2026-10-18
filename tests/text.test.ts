@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createEmptyProject } from '@shared/project/factory'
 import * as ops from '@shared/project/ops'
-import { animationFrameCount, cssFont, fontPx, splitGraphemes, textAnimationAt } from '@shared/render/textLayout'
+import { textAnimFrame } from '@shared/render/textAnims'
+import { animationFrameCount, cssFont, fontPx, splitGraphemes } from '@shared/render/textLayout'
 import { createTextClip } from '@shared/timeline/clips'
 import { Exporter } from '../src/main/export/exporter'
 import { listSystemFonts } from '../src/main/fonts'
@@ -31,15 +32,15 @@ describe('bố cục & hiệu ứng chữ', () => {
     expect(splitGraphemes(text)).toEqual(['V', 'i', 'ệ', 't'])
   })
 
-  it('hiệu ứng xuất hiện theo thời gian', () => {
+  it('hiệu ứng xuất hiện kiểu cũ vẫn chạy (quy đổi sang hiệu ứng Vào)', () => {
     const clip = { ...createTextClip(10 * S, 'Xin chào'), animationDuration: 1 * S }
-    expect(textAnimationAt({ ...clip, animationIn: 'fade' }, 10 * S).alpha).toBe(0)
-    expect(textAnimationAt({ ...clip, animationIn: 'fade' }, 12 * S).alpha).toBe(1)
-    expect(textAnimationAt({ ...clip, animationIn: 'slide-up' }, 10 * S).offsetY).toBeGreaterThan(0)
-    expect(textAnimationAt({ ...clip, animationIn: 'zoom' }, 10 * S).scale).toBeLessThan(1)
+    expect(textAnimFrame({ ...clip, animationIn: 'fade' }, 10 * S).block.alpha).toBe(0)
+    expect(textAnimFrame({ ...clip, animationIn: 'fade' }, 12 * S).block.alpha).toBe(1)
+    expect(textAnimFrame({ ...clip, animationIn: 'slide-up' }, 10 * S).block.dy).toBeGreaterThan(0)
+    expect(textAnimFrame({ ...clip, animationIn: 'zoom' }, 10 * S).block.scale).toBeLessThan(1)
     // Gõ chữ: "Xin chào" có 8 ký tự → giữa chừng hiện 4
-    expect(textAnimationAt({ ...clip, animationIn: 'typewriter' }, 10.5 * S).visibleGraphemes).toBe(4)
-    expect(textAnimationAt({ ...clip, animationIn: 'none' }, 10 * S).visibleGraphemes).toBeNull()
+    expect(textAnimFrame({ ...clip, animationIn: 'typewriter' }, 10.5 * S).visible!(8)).toBe(4)
+    expect(textAnimFrame({ ...clip, animationIn: 'none' }, 10 * S).visible).toBeNull()
   })
 
   it('số khung hiệu ứng khi xuất', () => {

@@ -7,6 +7,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { strings } from './strings'
 import { IpcChannels, type AppInfo } from '@shared/ipc'
 import { registerCaptionHandlers } from './ipc/captionHandlers'
+import { registerFavoritesHandlers } from './ipc/favoritesHandlers'
 import { registerExportHandlers } from './ipc/exportHandlers'
 import { registerMediaHandlers } from './ipc/mediaHandlers'
 import { registerProjectHandlers } from './ipc/projectHandlers'
@@ -108,6 +109,7 @@ function registerIpcHandlers(): void {
   registerProjectHandlers(media.hasTools() ? media.ffmpegExe : null)
   registerExportHandlers(media.ffmpegExe)
   registerCaptionHandlers(media.ffmpegExe)
+  registerFavoritesHandlers()
 }
 
 // Giao thức cutcap-media phải được khai báo trước khi app sẵn sàng

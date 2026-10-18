@@ -5,8 +5,13 @@ import { useTranslation } from 'react-i18next'
 import { EFFECT_CATEGORIES, EFFECTS, type EffectDef } from '@shared/render/effects'
 import { EffectPainter } from '../../engine/effects/applyEffect'
 import { THUMB_H, THUMB_W, sampleScene } from '../../engine/effects/sampleScene'
+import { createEffectClip } from '@shared/timeline/clips'
 import { addEffectAtPlayhead } from '../../state/effectActions'
+import { editorStore } from '../../state/editorStore'
+import { useFavorites } from '../../state/favoritesStore'
+import { FavoriteFilter, FavoriteStar } from '../Favorites'
 import { HelpTip } from '../HelpTip'
+import { TileAdd } from '../TileAdd'
 import { Icon } from '../icons'
 
 /**
@@ -60,16 +65,36 @@ function EffectThumb({ def }: { def: EffectDef }): React.JSX.Element {
 export function EffectsTab(): React.JSX.Element {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
+  const [onlyFavs, setOnlyFavs] = useState(false)
+  const [picked, setPicked] = useState<string | null>(null)
+  const favs = useFavorites('effect')
+  // Rời tab → bỏ bản xem thử
+  useEffect(() => () => editorStore.getState().setTilePreview(null), [])
+  /** Bấm 1 lần: chọn + xem thử trên khung Xem trước (bấm lại = bỏ chọn). */
+  const pick = (id: string): void => {
+    const off = picked === id
+    setPicked(off ? null : id)
+    editorStore.getState().setTilePreview(off ? null : { kind: 'clip', clip: createEffectClip(0, id) })
+  }
+  const add = (id: string): void => {
+    setPicked(null)
+    addEffectAtPlayhead(id)
+  }
   const name = (id: string): string => t(`effects.names.${id}`)
 
   const groups = useMemo(() => {
     const q = query.trim().toLocaleLowerCase('vi')
-    return EFFECT_CATEGORIES.map((cat) => ({
-      cat,
-      items: EFFECTS.filter((e) => e.category === cat && (!q || name(e.id).toLocaleLowerCase('vi').includes(q)))
-    })).filter((g) => g.items.length > 0)
+    const match = (e: EffectDef): boolean => !q || name(e.id).toLocaleLowerCase('vi').includes(q)
+    // ★ Yêu thích: một nhóm duy nhất, theo thứ tự đánh dấu (mới trước)
+    if (onlyFavs) {
+      const items = favs.map((id) => EFFECTS.find((e) => e.id === id)).filter((e): e is EffectDef => !!e && match(e))
+      return items.length > 0 ? [{ cat: 'favorites', items }] : []
+    }
+    return EFFECT_CATEGORIES.map((cat) => ({ cat: cat as string, items: EFFECTS.filter((e) => e.category === cat && match(e)) })).filter(
+      (g) => g.items.length > 0
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, t])
+  }, [query, t, onlyFavs, favs])
 
   return (
     <div className="left-scroll">
@@ -80,18 +105,25 @@ export function EffectsTab(): React.JSX.Element {
         </label>
         <HelpTip text={t('effects.hint')} />
       </div>
-      {groups.length === 0 && <p className="hint">{t('effects.noMatch')}</p>}
+      <FavoriteFilter only={onlyFavs} count={favs.length} onChange={setOnlyFavs} />
+      {groups.length === 0 && <p className="hint">{onlyFavs && !query ? t('favorites.empty') : t('effects.noMatch')}</p>}
       {groups.map(({ cat, items }) => (
         <section key={cat} className="effect-group">
-          <h3 className="left-heading">{t(`effects.categories.${cat}`)}</h3>
+          <h3 className="left-heading">{cat === 'favorites' ? `★ ${t('favorites.title')}` : t(`effects.categories.${cat}`)}</h3>
           <div className="preset-grid">
             {items.map((def) => (
-              <button key={def.id} className="preset-tile" title={t('effects.addHint')} onClick={() => addEffectAtPlayhead(def.id)}>
+              <button
+                key={def.id}
+                className={`preset-tile ${picked === def.id ? 'active' : ''}`}
+                title={t('effects.addHint')}
+                // Bấm 1 lần: chọn ô; bấm đúp hoặc bấm + : thêm vào timeline (giống CapCut)
+                onClick={() => pick(def.id)}
+                onDoubleClick={() => add(def.id)}
+              >
                 <EffectThumb def={def} />
-                <span className="tile-add">
-                  <Icon name="plus" size={13} />
-                </span>
+                <TileAdd title={t('effects.addHint')} onAdd={() => add(def.id)} />
                 <span className="preset-name">{name(def.id)}</span>
+                <FavoriteStar kind="effect" id={def.id} />
               </button>
             ))}
           </div>

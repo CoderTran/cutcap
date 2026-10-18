@@ -18,10 +18,8 @@ export function isActiveAt(clip: Clip, t: Micros): boolean {
   return t >= clip.start && t < clipEnd(clip)
 }
 
-/** Vị trí trong file gốc tương ứng thời điểm t trên timeline (đã tính tốc độ, chưa kẹp). */
-export function sourceTimeAt(clip: MediaClip, t: Micros): Micros {
-  return Math.round(clip.sourceIn + (t - clip.start) * clip.speed)
-}
+/** Vị trí trong file gốc tương ứng thời điểm t trên timeline (đã tính tốc độ / uốn cong, chưa kẹp). */
+export { sourceTimeAt } from './clipTime'
 
 export interface VisualLayer {
   clip: Clip

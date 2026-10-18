@@ -3,6 +3,8 @@
 import type { Clip, ColorAdjust, Id, MediaClip, Project, TextAnimation, TextStyle, Transform } from '../project/schema'
 import type { Micros } from '../project/time'
 import { clipEnd, findClip } from './clips'
+import { retimeCurveEdge, sourceSpanOf } from './clipTime'
+import { curveFactor, normalizePoints, type SpeedCurve } from './speedCurve'
 import { clampProp, scaleKeyframeTimes, setAnimatedValue, volumeAt } from './keyframes'
 
 export const MIN_SPEED = 0.25
@@ -31,7 +33,7 @@ export function planSpeed(project: Project, clipId: Id, speed: number, minDurati
   if (!found || found.clip.type !== 'media') return null
   const { track, clip } = found
   const s = clamp(speed, MIN_SPEED, MAX_SPEED)
-  const sourceSpan = clip.duration * clip.speed
+  const sourceSpan = sourceSpanOf(clip)
   const wanted = Math.round(sourceSpan / s)
   const next = track.clips[track.clips.indexOf(clip) + 1]
   const room = next ? next.start - clip.start : Number.MAX_SAFE_INTEGER
@@ -44,10 +46,41 @@ export function applySpeed(draft: Project, clipId: Id, speed: number, minDuratio
   const clip = findClip(draft, clipId)?.clip
   if (!plan || !clip || clip.type !== 'media') return
   // Keyframe bám theo nội dung: nhanh gấp đôi → khoảng cách giữa các keyframe ngắn đi một nửa
-  scaleKeyframeTimes(clip, clip.speed / plan.speed)
+  scaleKeyframeTimes(clip, plan.duration / Math.max(1, clip.duration))
   clip.speed = plan.speed
+  clip.speedCurve = null // chọn tốc độ đều → bỏ uốn cong
   clip.duration = plan.duration
   clampFades(clip)
+}
+
+/**
+ * Tốc độ → Uốn cong: đặt / bỏ đường cong. GIỮ NGUYÊN đoạn lấy trong file gốc, độ dài trên timeline
+ * co giãn theo đường cong (bỏ đường cong → về tốc độ đều `speed` hiện tại).
+ * Dài ra mà chạm clip phía sau → cắt bớt phần cuối cho vừa (không đẩy clip khác đi).
+ * @returns true nếu clip bị cắt bớt
+ */
+export function applySpeedCurve(draft: Project, clipId: Id, curve: SpeedCurve | null, minDuration: Micros): boolean {
+  const found = findClip(draft, clipId)
+  if (!found || found.clip.type !== 'media') return false
+  const { track, clip } = found
+  const span = sourceSpanOf(clip)
+  const oldDuration = clip.duration
+  const points = curve ? normalizePoints(curve.points) : null
+  clip.speedCurve = curve && points ? { ...curve, points } : null
+  const wanted = Math.max(minDuration, Math.round(clip.speedCurve ? span * curveFactor(clip.speedCurve) : span / clip.speed))
+  const next = track.clips[track.clips.indexOf(clip) + 1]
+  const room = next ? next.start - clip.start : Number.MAX_SAFE_INTEGER
+  clip.duration = wanted
+  let truncated = false
+  if (wanted > room) {
+    truncated = true
+    if (clip.speedCurve) retimeCurveEdge(clip, 'end', Math.max(minDuration, room))
+    else clip.duration = Math.max(minDuration, room)
+  }
+  // Keyframe bám theo nội dung: clip dài / ngắn đi bao nhiêu thì khoảng cách keyframe giãn / co bấy nhiêu
+  scaleKeyframeTimes(clip, wanted / Math.max(1, oldDuration))
+  clampFades(clip)
+  return truncated
 }
 
 // ───────────────────────── Âm lượng & fade ─────────────────────────
@@ -112,6 +145,31 @@ export function applyTextStyle(draft: Project, clipId: Id, changes: Partial<Text
   clip.style.strokeWidth = clamp(clip.style.strokeWidth, 0, 40)
 }
 
+/**
+ * Hiệu ứng động của chữ (Vào / Ra / Vòng lặp). value null = bỏ. Chọn hiệu ứng Vào mới → bỏ hiệu ứng xuất hiện kiểu cũ.
+ * Thời lượng Vào / Ra: 0.1–10 giây; chu kỳ Vòng lặp: 0.1–20 giây.
+ */
+export function applyTextAnim(
+  draft: Project,
+  clipId: Id,
+  kind: 'in' | 'out' | 'loop',
+  value: { id: string; duration: number } | { id: string; period: number } | null
+): void {
+  const clip = findClip(draft, clipId)?.clip
+  if (clip?.type !== 'text') return
+  if (kind === 'loop') {
+    const v = value as { id: string; period: number } | null
+    clip.textLoop = v ? { id: v.id, period: Math.round(clamp(v.period, 100_000, 20_000_000)) } : null
+    return
+  }
+  const v = value as { id: string; duration: number } | null
+  const next = v ? { id: v.id, duration: Math.round(clamp(v.duration, 100_000, 10_000_000)) } : null
+  if (kind === 'in') {
+    clip.textIn = next
+    clip.animationIn = 'none'
+  } else clip.textOut = next
+}
+
 export function applyTextAnimation(draft: Project, clipId: Id, animation: TextAnimation, duration: number): void {
   const clip = findClip(draft, clipId)?.clip
   if (clip?.type !== 'text') return
@@ -172,6 +230,7 @@ export function applyColorToAll(draft: Project, sourceClipId: Id): number {
       clip.filter = source.filter
       clip.filterIntensity = source.filterIntensity
       clip.adjust = { ...source.adjust }
+      clip.grade = source.grade ? structuredClone(source.grade) : null
       count++
     }
   }

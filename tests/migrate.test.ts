@@ -44,6 +44,11 @@ function sampleProject(): Project {
     audioFx: null,
     audioAssetId: null,
     loudnorm: null,
+    beauty: null,
+    faceShape: null,
+    speedCurve: null,
+    grade: null,
+    mask: null,
     keyframes: {}
   })
   return p

@@ -11,6 +11,7 @@ import { mkdir, readdir, rename, stat } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import type { ProjectSummary } from '@shared/ipc'
 import { samePath } from '@shared/media/formats'
+import { sourceTimeAt } from '@shared/timeline/clipTime'
 import { createEmptyProject, createId } from '@shared/project/factory'
 import { PROJECT_FILE_EXTENSION, type MediaClip, type Project } from '@shared/project/schema'
 import { projectDuration } from '@shared/timeline/clips'
@@ -129,7 +130,7 @@ export class ProjectLibrary {
     if (!existsSync(file)) {
       await mkdir(this.options.thumbsDir, { recursive: true })
       // Lấy khung hình sau điểm bắt đầu clip 0,5 giây (tránh khung đen đầu cảnh)
-      const seek = cover.image ? [] : ['-ss', ((cover.clip.sourceIn + 500_000 * cover.clip.speed) / 1e6).toFixed(3)]
+      const seek = cover.image ? [] : ['-ss', (sourceTimeAt(cover.clip, cover.clip.start + 500_000) / 1e6).toFixed(3)]
       await runProcess(this.options.ffmpegExe, [
         '-hide_banner', '-loglevel', 'error', '-y',
         ...seek, '-i', cover.path,

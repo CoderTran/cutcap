@@ -1,5 +1,7 @@
 // Tên các kênh IPC (giao tiếp giữa giao diện và tiến trình chính).
 // Đặt ở một chỗ để main và preload luôn dùng cùng một tên, tránh gõ sai.
+import type { SoundLibrary } from './audio/soundLibrary'
+import type { Favorites } from './favorites'
 import type { Caption, CaptionLanguage } from './captions/captions'
 import type { AudioDerive } from './media/derived'
 import type { FrameRate, MediaAsset, Project, Resolution } from './project/schema'
@@ -13,6 +15,14 @@ export const IpcChannels = {
   closeRequested: 'window:close-requested',
   closeWindow: 'window:close',
   pickMediaFiles: 'media:pick-files',
+  sfxSave: 'media:sfx-save',
+  favoritesGet: 'favorites:get',
+  favoritesSave: 'favorites:save',
+  sfxBundledDir: 'media:sfx-bundled-dir',
+  soundLibraryGet: 'sound-library:get',
+  soundLibraryPick: 'sound-library:pick',
+  soundLibraryRescan: 'sound-library:rescan',
+  soundLibraryClear: 'sound-library:clear',
   importMedia: 'media:import',
   extractAudio: 'media:extract-audio',
   measureLoudness: 'media:measure-loudness',
@@ -44,7 +54,12 @@ export const IpcChannels = {
   libraryReveal: 'library:reveal',
   captionsGenerate: 'captions:generate',
   captionsCancel: 'captions:cancel',
-  captionsProgress: 'captions:progress'
+  captionsProgress: 'captions:progress',
+  setPreviewQuality: 'media:set-preview-quality',
+  beautyOpen: 'beauty:open',
+  beautyRead: 'beauty:read',
+  beautyWrite: 'beauty:write',
+  beautyClose: 'beauty:close'
 } as const
 
 /** Thông tin cơ bản về ứng dụng, hiển thị ở thanh trạng thái. */
@@ -118,6 +133,13 @@ export type ExtractAudioResult =
   | { ok: true; path: string }
   | { ok: false; error: 'no-audio' | 'mono' | 'missing' | 'ffmpeg-missing' | 'failed'; detail?: string }
 
+/**
+ * Chất lượng khung Xem trước (giống CapCut): chỉ ảnh hưởng bản dùng để XEM, video xuất ra luôn lấy file gốc.
+ *  full: phát thẳng file gốc (nếu Chromium phát được) · high/medium/low: bản thu nhỏ 1080p / 720p / 540p
+ */
+export type PreviewQuality = 'full' | 'high' | 'medium' | 'low'
+export const PREVIEW_QUALITIES: PreviewQuality[] = ['full', 'high', 'medium', 'low']
+
 /** Tiến trình tạo phụ đề tự động. */
 export interface CaptionProgress {
   /** download: tải mô hình (lần đầu) · prepare: trộn tiếng · detect: tìm đoạn có lời · recognize: nhận dạng */
@@ -189,6 +211,45 @@ export interface ExportRequest {
   project: Project
   settings: ExportSettings
   textFrames: TextFrameSet[]
+  /** Clip có Làm đẹp đã được vẽ lại (file tạm) – lệnh xuất dùng thay cho file gốc. */
+  beautyRenders?: BeautyRender[]
+  /** Ảnh mặt nạ (PNG xám: trắng = giữ) theo clip – vẽ bằng đúng hàm của preview. */
+  maskImages?: MaskImages[]
+}
+
+/**
+ * Mặt nạ của một clip khi xuất: 1 ảnh (không keyframe), hoặc chuỗi ảnh mỗi khung hình (có keyframe)
+ * bắt đầu tại `startUs` trên timeline, `fps` ảnh mỗi giây.
+ */
+export type MaskImages =
+  | { clipId: string; png: Uint8Array }
+  | { clipId: string; frames: Uint8Array[]; startUs: number; fps: number }
+
+/** Đoạn clip đã làm đẹp: file tạm bắt đầu tại `offsetUs` của file gốc (ảnh: offsetUs = 0). */
+export interface BeautyRender {
+  clipId: string
+  path: string
+  offsetUs: number
+  /** Chiều cao khung hình của file đã làm đẹp (có thể nhỏ hơn file gốc). */
+  height: number
+}
+
+/** Yêu cầu vẽ lại một clip có Làm đẹp (xem main/beauty/beautyJobs.ts). */
+export interface BeautyJobRequest {
+  path: string
+  /** Đoạn cần trong file gốc (µs) – bỏ qua với ảnh. */
+  startUs: number
+  durationUs: number
+  width: number
+  height: number
+  fps: number
+  image: boolean
+}
+
+export interface BeautyJobInfo {
+  id: string
+  /** Số khung hình dự kiến (để hiện tiến trình). */
+  frames: number
 }
 
 export interface ExportProgress {
@@ -231,7 +292,19 @@ export interface CutcapApi {
   closeWindow(): void
 
   /** Hộp thoại chọn nhiều file media (only = 'video': chỉ cho chọn video). Trả về [] nếu bấm Hủy. */
-  pickMediaFiles(only?: 'video'): Promise<string[]>
+  pickMediaFiles(only?: 'video' | 'image'): Promise<string[]>
+  /** Hiệu ứng âm thanh (đã tổng hợp ở giao diện) → ghi file WAV vào thư mục của app, trả về đường dẫn. */
+  sfxSave(id: string, wav: Uint8Array): Promise<string>
+  /** Yêu thích (★) – dùng chung cho mọi dự án. */
+  favoritesGet(): Promise<Favorites>
+  favoritesSave(favorites: Favorites): Promise<void>
+  /** Thư mục hiệu ứng âm thanh có sẵn trong bộ cài (Kenney, CC0). */
+  sfxBundledDir(): Promise<string>
+  /** Thư viện âm thanh của bạn (thư mục trên máy): đã lưu / chọn thư mục (hủy → giữ nguyên) / quét lại / bỏ. */
+  soundLibraryGet(): Promise<SoundLibrary>
+  soundLibraryPick(): Promise<SoundLibrary>
+  soundLibraryRescan(): Promise<SoundLibrary>
+  soundLibraryClear(): Promise<SoundLibrary>
   /** Đọc thông tin các file (ffprobe) để thêm vào dự án. */
   importMedia(paths: string[]): Promise<ImportMediaResult[]>
   /**
@@ -297,4 +370,15 @@ export interface CutcapApi {
   generateCaptions(project: Project, language: CaptionLanguage): Promise<CaptionResult>
   cancelCaptions(): void
   onCaptionProgress(callback: (progress: CaptionProgress) => void): () => void
+
+  /** Đổi chất lượng khung Xem trước; main báo lại bản phát mới qua onMediaUpdated. */
+  setPreviewQuality(quality: PreviewQuality): Promise<void>
+
+  /** Xuất có Làm đẹp: mở 1 phiên vẽ lại clip → đọc khung gốc / ghi khung đã làm đẹp → đóng. */
+  beautyOpen(request: BeautyJobRequest): Promise<BeautyJobInfo>
+  /** Khung gốc tiếp theo (RGBA), null = hết. */
+  beautyRead(id: string): Promise<Uint8Array | null>
+  beautyWrite(id: string, frame: Uint8Array): Promise<void>
+  /** ok = false: hủy. @returns đường dẫn file đã làm đẹp */
+  beautyClose(id: string, ok: boolean): Promise<string | null>
 }

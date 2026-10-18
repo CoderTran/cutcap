@@ -22,16 +22,30 @@ import {
   pasteClips,
   splitClip,
   type ClipMove,
+  type MovePlan,
   type TrimEdge
 } from '@shared/timeline/edit'
+import { magnetInsert, mainTrack, packMainTrack } from '@shared/timeline/magnet'
 import { editorStore } from './editorStore'
 import { extractAudioAssets } from './mediaActions'
 import { mediaStore, pathKey } from './mediaStore'
-import { projectStore } from './projectStore'
+import { projectStore, setAfterEdit } from './projectStore'
 
 const project = () => projectStore.getState().project
 const apply = (...args: Parameters<ReturnType<typeof projectStore.getState>['apply']>): void =>
   projectStore.getState().apply(...args)
+
+// Hút vào đoạn chính: sau mỗi thay đổi (xóa, cắt, đổi tốc độ…) track chính tự dồn sát lại
+setAfterEdit((d) => {
+  if (editorStore.getState().magnet) packMainTrack(d)
+})
+
+/** Bật / tắt Hút vào đoạn chính (phím N). Vừa bật → dồn sát track chính ngay (1 bước Undo). */
+export function toggleMagnet(): void {
+  const on = !editorStore.getState().magnet
+  editorStore.getState().setMagnet(on)
+  if (on) apply('history.magnet', (d) => void packMainTrack(d))
+}
 
 /** Độ dài tối thiểu của clip = 1 frame theo fps của dự án. */
 export function minClipDuration(): Micros {
@@ -48,10 +62,15 @@ export function dropAssetOnTimeline(assetId: Id, trackId: Id | null, start: Micr
   const asset = project().assets[assetId]
   if (!asset) return null
 
-  const target = resolveDrop(project(), asset, trackId, start)
+  // Hút vào đoạn chính + thả vào track chính → chèn vào mối nối gần nhất, các clip sau dạt ra
+  const main = editorStore.getState().magnet ? mainTrack(project()) : undefined
+  const intoMain = main !== undefined && main.id === trackId && trackKindForAsset(asset) === 'video'
+  // (vào track chính: magnetInsert tự đặt lại vị trí, nên giữ nguyên `start` – có thể âm)
+  const target = intoMain ? { trackId: main.id, kind: main.kind, start } : resolveDrop(project(), asset, trackId, start)
   const clip = createMediaClip(asset, target.start)
   // Tạo track (nếu cần) + thêm clip = 1 bước Undo duy nhất
   apply('history.addClip', (d) => {
+    if (intoMain) return magnetInsert(d.tracks.find((t) => t.id === target.trackId)!, clip)
     const id = target.trackId ?? ops.addTrack(d, target.kind)
     ops.addClip(d, id, clip)
   })
@@ -59,17 +78,26 @@ export function dropAssetOnTimeline(assetId: Id, trackId: Id | null, start: Micr
   return clip.id
 }
 
-/** Nút "+" trên thẻ media: thêm vào track chính tại đầu phát (chỗ đó bận thì tạo track mới). */
+/** Nút "+" trên thẻ media: thêm vào track chính tại đầu phát (chỗ đó bận thì tạo track mới; Hút vào đoạn chính: chèn vào mối nối). */
 export function addAssetAtPlayhead(assetId: Id): Id | null {
   const asset = project().assets[assetId]
   if (!asset) return null
-  const track = mainTrackFor(project(), trackKindForAsset(asset))
-  return dropAssetOnTimeline(assetId, track?.id ?? null, editorStore.getState().currentTime)
+  const kind = trackKindForAsset(asset)
+  const track = mainTrackFor(project(), kind)
+  const { currentTime, magnet, setCurrentTime } = editorStore.getState()
+  if (!magnet || kind !== 'video') return dropAssetOnTimeline(assetId, track?.id ?? null, currentTime)
+  // Hút vào đoạn chính: chèn vào mối nối gần đầu phát nhất, rồi đưa đầu phát tới cuối clip mới
+  // → bấm "+" liên tiếp thì các clip xếp nối đuôi nhau đúng thứ tự
+  const duration = createMediaClip(asset, 0).duration
+  const id = dropAssetOnTimeline(assetId, track?.id ?? null, currentTime - duration / 2)
+  const added = id ? findClip(project(), id)?.clip : undefined
+  if (added) setCurrentTime(added.start + added.duration)
+  return id
 }
 
 /** Di chuyển clip (sau khi kéo thả). */
-export function moveClips(moves: ClipMove[]): void {
-  if (moves.length > 0) apply('history.moveClips', (d) => applyMoves(d, moves))
+export function moveClips(moves: ClipMove[], newTrack?: MovePlan['newTrack']): void {
+  if (moves.length > 0) apply('history.moveClips', (d) => applyMoves(d, moves, newTrack))
 }
 
 /** Kéo mép clip. */

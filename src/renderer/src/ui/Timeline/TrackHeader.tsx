@@ -1,22 +1,39 @@
 // Cột trái của mỗi track (kiểu CapCut): tên ngắn + biểu tượng khóa / ẩn / tắt tiếng / xóa.
 import { useTranslation } from 'react-i18next'
 import type { Track } from '@shared/project/schema'
+import { openCoverDialog } from '../../state/coverActions'
 import { removeTrack, toggleTrackFlag } from '../../state/projectActions'
+import { useProjectStore } from '../../state/projectStore'
 import { Icon } from '../icons'
 import { HEADER_WIDTH, trackHeight } from './layout'
 
 interface Props {
   track: Track
   label: string
+  /** Track chính (track video dưới cùng): có nút "Ảnh bìa" như CapCut. */
+  isMain?: boolean
 }
 
-export function TrackHeader({ track, label }: Props): React.JSX.Element {
+export function TrackHeader({ track, label, isMain = false }: Props): React.JSX.Element {
   const { t } = useTranslation()
   const hasPicture = track.kind !== 'audio'
   const hasSound = track.kind === 'video' || track.kind === 'audio'
 
+  const coverThumb = useProjectStore((s) => s.project.cover?.thumb ?? null)
+
   return (
-    <div className={`tl-header kind-${track.kind}`} style={{ width: HEADER_WIDTH, height: trackHeight(track) }}>
+    <div className={`tl-header kind-${track.kind} ${isMain ? 'with-cover' : ''}`} style={{ width: HEADER_WIDTH, height: trackHeight(track) }}>
+      {isMain && (
+        <button
+          className={`tl-cover ${coverThumb ? 'has-thumb' : ''}`}
+          style={coverThumb ? { backgroundImage: `url("${coverThumb}")` } : undefined}
+          onClick={openCoverDialog}
+          title={t('cover.buttonHint')}
+        >
+          <Icon name="pencil" size={13} />
+          <span>{t('cover.button')}</span>
+        </button>
+      )}
       <span className="tl-header-name" title={label}>
         {label}
       </span>

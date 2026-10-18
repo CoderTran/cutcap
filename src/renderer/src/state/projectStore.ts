@@ -20,6 +20,12 @@ import {
   type History
 } from './history'
 
+/** Bước chạy thêm sau MỌI thay đổi (vd. Tự động gắn dồn track chính) – nằm chung bước Undo. */
+let afterEdit: ((draft: Draft<Project>) => void) | null = null
+export function setAfterEdit(fn: ((draft: Draft<Project>) => void) | null): void {
+  afterEdit = fn
+}
+
 export interface ProjectState {
   project: Project
   /** Đường dẫn file .cutcap; null = chưa lưu lần nào. */
@@ -61,6 +67,7 @@ export function createProjectStore(initial: Project = createEmptyProject('')) {
       const withPrune = (d: Draft<Project>): void => {
         recipe(d)
         pruneEmptyTracks(d)
+        afterEdit?.(d)
       }
       const result = commit(project, history, label, withPrune, { ...options, protectedId: savedEntryId })
       if (result.state !== project) set({ project: result.state, history: result.history })

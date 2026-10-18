@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import type { EncoderId, ExportQuality, ExportResult } from '@shared/ipc'
 import { fileNameOf } from '@shared/media/formats'
-import { canvasSize } from '@shared/project/canvas'
+import { aspectValue, canvasSize } from '@shared/project/canvas'
 import { ASPECT_RATIOS, FRAME_RATES, RESOLUTIONS, type FrameRate, type Resolution } from '@shared/project/schema'
 import { formatDuration } from '@shared/project/time'
 import { projectDuration } from '@shared/timeline/clips'
@@ -15,9 +15,11 @@ import {
   startExport,
   useExportStore
 } from '../../state/exportStore'
+import { isCoverDialogOpen, openCoverDialog } from '../../state/coverActions'
 import { updateSettings } from '../../state/projectActions'
 import { useProjectStore } from '../../state/projectStore'
 import { formatBytes } from '../format'
+import { Icon } from '../icons'
 
 const QUALITIES: ExportQuality[] = ['high', 'standard', 'small']
 
@@ -31,7 +33,7 @@ export function ExportDialog(): React.JSX.Element | null {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !isCoverDialogOpen()) {
         e.stopPropagation()
         closeExportDialog()
       }
@@ -84,6 +86,22 @@ function SettingsView(): React.JSX.Element {
     <>
       <h2 className="modal-title">{t('export.title')}</h2>
       <div className="form">
+        {/* Ảnh bìa: nhúng vào file video (hình thu nhỏ) */}
+        <div className="export-cover">
+          <button
+            className="export-cover-thumb"
+            style={{
+              aspectRatio: String(aspectValue(project.settings.aspectRatio)),
+              backgroundImage: project.cover ? `url("${project.cover.thumb}")` : undefined
+            }}
+            onClick={openCoverDialog}
+          >
+            <span>
+              <Icon name="pencil" size={12} /> {project.cover ? t('cover.edit') : t('cover.add')}
+            </span>
+          </button>
+          <p className="hint">{project.cover ? t('cover.exportHint') : t('cover.exportNone')}</p>
+        </div>
         <div className="field">
           <span>{t('export.file')}</span>
           <div className="path-row">
@@ -182,6 +200,7 @@ function ProgressView(): React.JSX.Element {
   const { t } = useTranslation()
   const progress = useExportStore((s) => s.progress)
   const path = useExportStore((s) => s.lastOutputPath)
+  const prep = useExportStore((s) => s.beautyPrep)
   const percent = Math.round((progress?.progress ?? 0) * 100)
 
   return (
@@ -191,8 +210,10 @@ function ProgressView(): React.JSX.Element {
         {path ? fileNameOf(path) : ''}
       </p>
       <div className="export-bar">
-        <div style={{ width: `${percent}%` }} />
+        <div style={{ width: `${prep ? Math.round((prep.done / Math.max(1, prep.total)) * 100) : percent}%` }} />
       </div>
+      {/* Bước làm đẹp từng khung hình chạy trước khi FFmpeg bắt đầu xuất */}
+      {prep && <p className="hint">{t('beauty.exporting', { done: prep.done, total: prep.total })}</p>}
       <dl className="info-list">
         <div>
           <dt>{t('export.percent')}</dt>
@@ -228,6 +249,7 @@ function ProgressView(): React.JSX.Element {
 
 function errorMessage(result: Extract<ExportResult, { status: 'error' }>, t: TFunction): string {
   if (result.message === 'empty') return t('export.errors.empty')
+  if (result.message === 'beauty') return t('export.errors.beauty')
   if (result.message.startsWith('missing:')) return t('export.errors.missing', { files: result.message.slice(8) })
   return t('export.errors.ffmpeg')
 }

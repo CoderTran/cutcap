@@ -2,7 +2,9 @@
 import { createStore, useStore } from 'zustand'
 import type { EncoderId, ExportProgress, ExportResult, ExportSettings } from '@shared/ipc'
 import { canvasSize } from '@shared/project/canvas'
+import { BeautyCancelled, renderBeautyClips } from '../engine/beauty/renderBeautyClips'
 import { renderEffectFrames } from '../engine/effects/renderEffectFrames'
+import { renderMaskImages } from '../engine/mask/renderMaskImages'
 import { renderTextFrames } from '../engine/text/renderTextFrames'
 import { pause } from './playbackActions'
 import { projectStore } from './projectStore'
@@ -18,6 +20,8 @@ export interface ExportState {
   encoders: EncoderId[] | null
   /** Nhớ đường dẫn lần xuất trước trong phiên làm việc. */
   lastOutputPath: string | null
+  /** Bước chuẩn bị: làm đẹp từng khung hình (null = không có / đã xong). */
+  beautyPrep: { done: number; total: number } | null
 }
 
 export const exportStore = createStore<ExportState>()(() => ({
@@ -26,8 +30,12 @@ export const exportStore = createStore<ExportState>()(() => ({
   progress: null,
   result: null,
   encoders: null,
-  lastOutputPath: null
+  lastOutputPath: null,
+  beautyPrep: null
 }))
+
+/** Bấm "Dừng" trong lúc đang làm đẹp khung hình (trước khi FFmpeg bắt đầu xuất). */
+let prepCancelled = false
 
 export function useExportStore<T>(selector: (s: ExportState) => T): T {
   return useStore(exportStore, selector)
@@ -64,10 +72,30 @@ export async function startExport(settings: ExportSettings): Promise<void> {
   const textFrames = await renderTextFrames(project, size.width, size.height, settings.fps)
   // Lớp phủ vẽ của hiệu ứng (tim bay, lấp lánh…) – cũng vẽ sẵn bằng đúng hàm của preview
   const effectFrames = await renderEffectFrames(project, size.width, size.height, settings.fps)
-  await window.cutcap.startExport({ project, settings, textFrames: [...textFrames, ...effectFrames] })
+  // Làm đẹp: vẽ lại từng khung hình của clip (AI nhận diện mặt + WebGL – đúng code của khung Xem trước)
+  prepCancelled = false
+  let beautyRenders
+  try {
+    beautyRenders = await renderBeautyClips(project, size.width, size.height, {
+      onProgress: (done, total) => exportStore.setState({ beautyPrep: { done, total } }),
+      cancelled: () => prepCancelled
+    })
+  } catch (err) {
+    exportStore.setState({
+      phase: 'finished',
+      dialogOpen: true,
+      beautyPrep: null,
+      result: err instanceof BeautyCancelled ? { status: 'cancelled' } : { status: 'error', message: 'beauty', detail: (err as Error).message }
+    })
+    return
+  }
+  exportStore.setState({ beautyPrep: null })
+  const maskImages = await renderMaskImages(project, settings.fps)
+  await window.cutcap.startExport({ project, settings, textFrames: [...textFrames, ...effectFrames], beautyRenders, maskImages })
 }
 
 export function cancelExport(): void {
+  prepCancelled = true
   window.cutcap.cancelExport()
 }
 

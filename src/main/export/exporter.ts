@@ -2,12 +2,13 @@
 // Không import electron → test tích hợp chạy được với ffmpeg thật.
 import { existsSync } from 'node:fs'
 import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { EncoderId, ExportProgress, ExportRequest, ExportResult, TextFrameSet } from '@shared/ipc'
 import { canvasSize } from '@shared/project/canvas'
 import { clipAssetId, projectDuration } from '@shared/timeline/clips'
 import { ProcessError, runProcess } from '../media/processRunner'
-import { buildExportGraph, sec, type TextFramesOnDisk } from './graphBuilder'
+import { buildLut, hasColorChanges, lutToCube } from '@shared/render/grade'
+import { type MaskOnDisk, buildExportGraph, sec, type TextFramesOnDisk } from './graphBuilder'
 import { detectEncoders, encoderArgs, pixelFormatFor } from './encoders'
 
 export interface ExporterOptions {
@@ -62,10 +63,12 @@ export class Exporter {
       // 4) Chạy; nếu GPU lỗi giữa chừng (driver, hết bộ nhớ…) thì tự thử lại bằng CPU
       try {
         await this.encode(first, request, durationUs, startedAt, partial, workDir, textFrames)
+        await this.embedCover(project, partial, workDir, durationUs)
         return await this.finish(partial, settings.outputPath, startedAt, first)
       } catch (err) {
         if (this.controller.signal.aborted || first === 'libx264' || err instanceof ExportValidationError) throw err
         await this.encode('libx264', request, durationUs, startedAt, partial, workDir, textFrames)
+        await this.embedCover(project, partial, workDir, durationUs)
         return await this.finish(partial, settings.outputPath, startedAt, 'libx264')
       }
     } catch (err) {
@@ -77,12 +80,14 @@ export class Exporter {
     } finally {
       this.controller = null
       await rm(workDir, { recursive: true, force: true })
+      // File tạm của Làm đẹp (mỗi clip một thư mục beauty-…)
+      for (const b of request.beautyRenders ?? []) await rm(dirname(b.path), { recursive: true, force: true })
     }
   }
 
   private async encode(
     encoder: EncoderId,
-    { project, settings }: ExportRequest,
+    { project, settings, beautyRenders, maskImages }: ExportRequest,
     durationUs: number,
     startedAt: number,
     partial: string,
@@ -90,15 +95,43 @@ export class Exporter {
     textFrames: Map<string, TextFramesOnDisk>
   ): Promise<void> {
     const size = canvasSize(project.settings.aspectRatio, settings.resolution)
+    // Điều chỉnh màu: mỗi clip một bảng màu 3D (.cube) – cùng hàm màu với preview (shared/render/grade.ts)
+    await mkdir(workDir, { recursive: true })
+    const gradeLuts = new Map<string, string>()
+    for (const track of project.tracks) {
+      for (const clip of track.clips) {
+        if (clip.type !== 'media' || !hasColorChanges(clip.grade)) continue
+        const name = `lut-${gradeLuts.size}.cube`
+        await writeFile(join(workDir, name), lutToCube(buildLut(clip.grade!)), 'utf8')
+        gradeLuts.set(clip.id, name)
+      }
+    }
+    // Mặt nạ: ảnh xám do giao diện vẽ sẵn
+    const masks = new Map<string, MaskOnDisk>()
+    for (const [i, m] of (maskImages ?? []).entries()) {
+      if ('png' in m) {
+        const file = join(workDir, `mask-${i}.png`)
+        await writeFile(file, m.png)
+        masks.set(m.clipId, { file })
+      } else {
+        // Mặt nạ có keyframe: chuỗi ảnh m_000000.png…
+        const dir = join(workDir, `mask-${i}`)
+        await mkdir(dir, { recursive: true })
+        for (const [n, png] of m.frames.entries()) await writeFile(join(dir, `m_${String(n).padStart(6, '0')}.png`), png)
+        masks.set(m.clipId, { pattern: join(dir, 'm_%06d.png'), startUs: m.startUs, fps: m.fps })
+      }
+    }
     const graph = buildExportGraph(project, {
       ...size,
       fps: settings.fps,
       pixelFormat: pixelFormatFor(encoder),
-      textFrames
+      textFrames,
+      beautyRenders: new Map((beautyRenders ?? []).map((b) => [b.clipId, b])),
+      gradeLuts,
+      masks
     })
 
     // Filtergraph có thể rất dài → ghi ra file (dòng lệnh Windows giới hạn ~32 nghìn ký tự)
-    await mkdir(workDir, { recursive: true })
     const graphFile = join(workDir, `graph-${encoder}.txt`)
     await writeFile(graphFile, graph.filterGraph, 'utf8')
 
@@ -123,6 +156,8 @@ export class Exporter {
     let lastEmit = 0
     try {
       await runProcess(this.options.ffmpegExe, args, {
+        // Chạy trong thư mục làm việc: bảng màu .cube gọi bằng tên file (đường dẫn Windows có ":" khó thoát)
+        cwd: workDir,
         signal: this.controller!.signal,
         onStdoutLine: (line) => {
           // -progress in ra các dòng "key=value"; ta chỉ cần out_time_us và speed
@@ -145,6 +180,38 @@ export class Exporter {
       })
     } finally {
       await rm(graphFile, { force: true })
+    }
+  }
+
+  /**
+   * Ảnh bìa: lấy khung hình tại thời điểm đã chọn từ CHÍNH video vừa xuất (đủ chữ, hiệu ứng, màu…) hoặc ảnh trên máy,
+   * rồi nhúng vào file mp4 làm hình thu nhỏ (không mã hóa lại video). Lỗi ở bước này → vẫn giữ video, chỉ thiếu ảnh bìa.
+   */
+  private async embedCover(project: ExportRequest['project'], partial: string, workDir: string, durationUs: number): Promise<void> {
+    const cover = project.cover
+    if (!cover) return
+    const ffmpeg = this.options.ffmpegExe
+    const signal = this.controller!.signal
+    const q = ['-hide_banner', '-loglevel', 'error', '-y']
+    const jpg = join(workDir, 'cover.jpg')
+    const withCover = `${partial}.cover`
+    try {
+      if (cover.kind === 'frame') {
+        const at = Math.max(0, Math.min(cover.time, durationUs - 100_000))
+        await runProcess(ffmpeg, [...q, '-ss', sec(at), '-i', partial, '-frames:v', '1', '-q:v', '2', jpg], { signal })
+      } else {
+        await runProcess(ffmpeg, [...q, '-i', cover.path, '-frames:v', '1', '-vf', "scale='min(1920,iw)':-2", '-q:v', '2', jpg], { signal })
+      }
+      await runProcess(
+        ffmpeg,
+        [...q, '-i', partial, '-i', jpg, '-map', '0', '-map', '1', '-c', 'copy', '-disposition:v:1', 'attached_pic', '-movflags', '+faststart', '-f', 'mp4', withCover],
+        { signal }
+      )
+      await rm(partial, { force: true })
+      await rename(withCover, partial)
+    } catch (err) {
+      await rm(withCover, { force: true })
+      if (signal.aborted) throw err
     }
   }
 

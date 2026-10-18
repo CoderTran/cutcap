@@ -3,6 +3,12 @@
 // Vì file JSON có thể bị sửa tay, hỏng giữa chừng, hoặc tạo bởi phiên bản Cutcap khác,
 // KHÔNG BAO GIỜ tin dữ liệu đọc vào. Hàm parseProject() kiểm tra từng phần quan trọng
 // và điền giá trị mặc định cho trường thiếu, để phần còn lại của app không bị crash.
+import { parseBeauty } from '../render/beauty'
+import { parseFaceShape } from '../render/faceShape'
+import { parseGrade } from '../render/grade'
+import { parseMask } from '../render/mask'
+import { parseSpeedCurve } from '../timeline/speedCurve'
+import { parseTextFx } from '../render/textFx'
 import { defaultColorAdjust, defaultSettings, defaultTransform } from './factory'
 import {
   ASPECT_RATIOS,
@@ -205,7 +211,13 @@ function parseClip(v: unknown, where: string): Clip {
         loudnorm:
           isObj(v.loudnorm) && Number.isFinite(v.loudnorm.measured) && Number.isFinite(v.loudnorm.prevVolume)
             ? { measured: v.loudnorm.measured as number, prevVolume: num(v.loudnorm.prevVolume, 1, 0, 2) }
-            : null
+            : null,
+        // Trường mới (Làm đẹp): file cũ không có → null
+        beauty: parseBeauty(v.beauty),
+        faceShape: parseFaceShape(v.faceShape),
+        speedCurve: parseSpeedCurve(v.speedCurve),
+        grade: parseGrade(v.grade),
+        mask: parseMask(v.mask)
       }
     }
     case 'effect':
@@ -226,10 +238,14 @@ function parseClip(v: unknown, where: string): Clip {
           align: oneOf(s.align, ['left', 'center', 'right'] as const, 'center'),
           strokeColor: nullableStr(s.strokeColor),
           strokeWidth: num(s.strokeWidth, 0, 0, 100),
-          backgroundColor: nullableStr(s.backgroundColor)
+          backgroundColor: nullableStr(s.backgroundColor),
+          fx: parseTextFx(s.fx)
         },
         animationIn: oneOf(v.animationIn, TEXT_ANIMATIONS, 'none'),
         animationDuration: micros(v.animationDuration, 500_000),
+        textIn: parseTextAnim(v.textIn, 'duration'),
+        textOut: parseTextAnim(v.textOut, 'duration'),
+        textLoop: parseTextLoop(v.textLoop),
         caption: v.caption === true
       }
     }
@@ -297,8 +313,27 @@ export function parseProject(raw: unknown): Project {
     updatedAt: str(data.updatedAt, now),
     settings: parseSettings(data.settings),
     assets,
-    tracks: (data.tracks as unknown[]).map(parseTrack)
+    tracks: (data.tracks as unknown[]).map(parseTrack),
+    cover: parseCover(data.cover)
   }
+}
+
+/** Hiệu ứng động Vào / Ra của chữ (mã lạ – vd. từ phiên bản mới hơn – giữ nguyên, lúc vẽ bỏ qua). */
+function parseTextAnim(v: unknown, _field: 'duration'): { id: string; duration: number } | null {
+  if (!isObj(v) || typeof v.id !== 'string' || !v.id || v.id.length > 64) return null
+  return { id: v.id, duration: Math.round(num(v.duration, 500_000, 100_000, 10_000_000)) }
+}
+function parseTextLoop(v: unknown): { id: string; period: number } | null {
+  if (!isObj(v) || typeof v.id !== 'string' || !v.id || v.id.length > 64) return null
+  return { id: v.id, period: Math.round(num(v.period, 1_000_000, 100_000, 20_000_000)) }
+}
+
+/** Ảnh bìa: sai dạng → bỏ (không làm hỏng cả dự án). */
+function parseCover(v: unknown): Project['cover'] {
+  if (!isObj(v) || typeof v.thumb !== 'string' || !v.thumb.startsWith('data:image/')) return null
+  if (v.kind === 'frame' && typeof v.time === 'number' && Number.isFinite(v.time)) return { kind: 'frame', time: Math.max(0, Math.round(v.time)), thumb: v.thumb }
+  if (v.kind === 'image' && typeof v.path === 'string' && v.path !== '') return { kind: 'image', path: v.path, thumb: v.thumb }
+  return null
 }
 
 /** Đọc chuỗi JSON thành Project. */

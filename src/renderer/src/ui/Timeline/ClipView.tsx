@@ -4,6 +4,7 @@
 //  - Kéo thân clip: di chuyển (cả sang track khác cùng loại)
 //  - Kéo mép trái/phải: cắt bớt / kéo dài
 // Logic kéo nằm ở useClipDrag; component này chỉ báo "bắt đầu kéo ở chế độ nào".
+import { sourceSpanOf } from '@shared/timeline/clipTime'
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Clip, Id, MediaAsset, TrackKind } from '@shared/project/schema'
@@ -66,7 +67,8 @@ function startKeyframeDrag(e: React.PointerEvent, clip: Clip, time: Micros, pxPe
 /** Ảnh thu nhỏ lặp lại + sóng âm của file gốc, cắt đúng đoạn clip đang dùng. */
 function MediaStrip({ clip, asset, pxPerSecond }: { clip: Clip; asset: MediaAsset; pxPerSecond: number }): React.JSX.Element | null {
   const preview = useMediaPreview(asset.path)
-  const speed = clip.type === 'media' ? clip.speed : 1
+  // Uốn cong: sóng âm không giãn đều được → vẽ theo tốc độ trung bình của clip
+  const speed = clip.type === 'media' ? sourceSpanOf(clip) / Math.max(1, clip.duration) : 1
   const sourceIn = clip.type === 'media' ? clip.sourceIn : 0
   // Ảnh sóng âm vẽ cho CẢ file → giãn theo độ dài file (đã tính tốc độ) và dịch tới điểm bắt đầu cắt
   const waveWidth = timeToPx(asset.durationUs / speed, pxPerSecond)
@@ -128,7 +130,11 @@ export const ClipView = memo(function ClipView({
           <>
             <span className="tl-clip-name">{name}</span>
             {width > 120 && <span className="tl-clip-time">{formatTimecode(clip.duration, fps)}</span>}
-            {media && media.speed !== 1 && <span className="tl-badge">{media.speed}×</span>}
+            {media?.speedCurve ? (
+              <span className="tl-badge">{t('speedCurve.title')}</span>
+            ) : (
+              media && media.speed !== 1 && <span className="tl-badge">{media.speed}×</span>
+            )}
             {media && media.volume === 0 && asset?.hasAudio && <span className="tl-badge">🔇</span>}
           </>
         )}

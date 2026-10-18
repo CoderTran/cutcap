@@ -15,6 +15,8 @@ resources/whisper/*.dll
 resources/whisper/*.bin
 resources/whisper/LICENSE.txt
 resources/whisper/whisper-build.json
+# AI nhận diện khuôn mặt (Làm đẹp) – chạy: npm run setup:face
+src/renderer/public/mediapipe/
 # File hệ thống Windows / OneDrive
 Thumbs.db
 desktop.ini

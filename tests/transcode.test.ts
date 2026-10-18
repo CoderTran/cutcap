@@ -3,7 +3,7 @@ import type { ProbeInfo } from '../src/main/media/probe'
 import { parseProgressLine } from '../src/main/media/processRunner'
 import { parseRange } from '../src/main/media/range'
 import { filePathFromMediaUrl, mediaUrl } from '../src/main/media/mediaUrl'
-import { proxyArgs, proxyNeeded } from '../src/main/media/transcode'
+import { canPlayOriginal, proxyArgs, proxyFileName, proxyNeeded } from '../src/main/media/transcode'
 
 const baseVideo: ProbeInfo = {
   kind: 'video',
@@ -47,6 +47,18 @@ describe('proxyNeeded', () => {
     expect(args).toContain('libx264')
     expect(args.join(' ')).toContain('-progress pipe:1')
     expect(args.at(-1)).toBe('out.part')
+  })
+
+  it('chất lượng xem trước: proxy theo cạnh ngắn; "Đầy đủ" phát thẳng H.264 4K của máy ảnh', () => {
+    expect(proxyFileName('video')).toBe('proxy.mp4') // 540p giữ tên cũ – dùng lại cache cũ
+    expect(proxyFileName('video', 1080)).toBe('proxy-1080.mp4')
+    expect(proxyArgs('video', 'in.mov', 'o', 720).join(' ')).toContain('min(720,ih)')
+    expect(proxyArgs('video', 'in.mov', 'o', 720)).toContain('22')
+    const camera4k = { ...baseVideo, width: 3840, height: 2160, pixelFormat: 'yuvj420p' }
+    expect(proxyNeeded(camera4k, 'DSCF2285.MOV')).toBe('video')
+    expect(canPlayOriginal(camera4k, 'DSCF2285.MOV')).toBe(true)
+    expect(canPlayOriginal({ ...camera4k, videoCodec: 'hevc' }, 'a.mp4')).toBe(false)
+    expect(canPlayOriginal(camera4k, 'a.mkv')).toBe(false)
   })
 })
 

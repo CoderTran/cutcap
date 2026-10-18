@@ -20,6 +20,9 @@ import { effectiveFades } from '@shared/timeline/clipProps'
 import { clipAnimExprs, hasClipAnim, maxAnimScale } from '@shared/render/clipAnims'
 import { findEffect, hasOverlay } from '@shared/render/effects'
 import { ffmpegValueExpr, hasKeyframes, keyframesOf } from '@shared/timeline/keyframes'
+import { edgeSpeeds, sourceSpanOf } from '@shared/timeline/clipTime'
+import { curveSegments, curveSpeedAt } from '@shared/timeline/speedCurve'
+import { hasColorChanges, isGradeEmpty, spatialParams, type ColorGrade } from '@shared/render/grade'
 import { transitionAt, type ActiveTransition } from '@shared/timeline/transitions'
 
 export interface ExportGraph {
@@ -51,7 +54,16 @@ export interface GraphOptions {
   pixelFormat: string
   /** Ảnh chữ theo id clip chữ. Clip chữ không có ở đây sẽ bị bỏ qua. */
   textFrames?: Map<string, TextFramesOnDisk>
+  /** Clip có Làm đẹp: phần hình đọc từ file đã làm đẹp (bắt đầu tại offsetUs của file gốc). */
+  beautyRenders?: Map<string, { path: string; offsetUs: number; height: number }>
+  /** Điều chỉnh màu: tên file .cube (trong thư mục làm việc của ffmpeg) theo id clip. */
+  gradeLuts?: Map<string, string>
+  /** Mặt nạ: ảnh PNG xám (trắng = giữ) hoặc chuỗi ảnh (có keyframe) theo id clip. */
+  masks?: Map<string, MaskOnDisk>
 }
+
+/** Mặt nạ đã ghi ra đĩa: 1 ảnh, hoặc chuỗi ảnh bắt đầu tại startUs trên timeline. */
+export type MaskOnDisk = { file: string } | { pattern: string; startUs: Micros; fps: number }
 
 /** Micro-giây → chuỗi giây có 6 chữ số thập phân (FFmpeg hiểu chính xác tới µs). */
 export const sec = (us: Micros): string => (us / MICROS_PER_SECOND).toFixed(6)
@@ -224,17 +236,22 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
     const existing = inputOf.get(clip.id)
     if (existing) return existing
     let info: InputInfo = { index: inputCount, sourceOffset: 0, padStart: 0 }
+    // Làm đẹp: đọc phần hình từ file đã vẽ lại (thời gian tính lại theo điểm bắt đầu của file đó)
+    const beauty = opts.beautyRenders?.get(clip.id)
+    const path = beauty?.path ?? asset.path
+    const offset = beauty?.offsetUs ?? 0
     if (asset.kind === 'image') {
       // Ảnh tĩnh: lặp 1 ảnh thành video dài đúng thời lượng hiện trên màn hình
-      inputArgs.push('-loop', '1', '-framerate', String(fps), '-t', sec(clip.duration + extBefore + extAfter), '-i', asset.path)
+      inputArgs.push('-loop', '1', '-framerate', String(fps), '-t', sec(clip.duration + extBefore + extAfter), '-i', path)
     } else if (clip.type === 'media') {
       // Muốn đọc từ sớm hơn điểm cắt (cho chuyển cảnh); file không đủ thì đọc từ 0 và "giữ khung đầu" phần thiếu
-      const wanted = clip.sourceIn - extBefore * clip.speed
+      const edges = edgeSpeeds(clip)
+      const wanted = clip.sourceIn - offset - extBefore * edges.start
       const start = Math.max(0, wanted)
-      const readDuration = Math.round((clip.duration + extBefore + extAfter) * clip.speed - (start - wanted))
+      const readDuration = Math.round(sourceSpanOf(clip) + extBefore * edges.start + extAfter * edges.end - (start - wanted))
       // -ss đặt TRƯỚC -i: nhảy nhanh tới điểm cắt; -t: chỉ đọc đúng đoạn cần (đã nhân tốc độ)
-      inputArgs.push('-ss', sec(start), '-t', sec(readDuration), '-i', asset.path)
-      info = { index: inputCount, sourceOffset: clip.sourceIn - start, padStart: Math.round((start - wanted) / clip.speed) }
+      inputArgs.push('-ss', sec(start), '-t', sec(readDuration), '-i', path)
+      info = { index: inputCount, sourceOffset: clip.sourceIn - offset - start, padStart: Math.round((start - wanted) / edges.start) }
     } else {
       inputArgs.push('-i', asset.path) // sticker (Bước sau)
     }
@@ -243,9 +260,20 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
     return info
   }
 
+  /** Ảnh mặt nạ của clip: lặp đúng thời lượng lớp hình. @returns nhãn đầu vào, hoặc null nếu clip không có mặt nạ */
+  const addMaskInput = (clip: Clip, extBefore: Micros, extAfter: Micros): string | null => {
+    const m = clip.type === 'media' && clip.mask ? opts.masks?.get(clip.id) : undefined
+    if (!m) return null
+    const length = sec(clip.duration + extBefore + extAfter)
+    if ('file' in m) inputArgs.push('-loop', '1', '-framerate', String(fps), '-t', length, '-i', m.file)
+    // Chuỗi ảnh (mặt nạ có keyframe): bỏ phần trước đầu lớp hình để ảnh khớp đúng thời điểm
+    else inputArgs.push('-framerate', String(m.fps), '-ss', sec(clip.start - extBefore - m.startUs), '-t', length, '-i', m.pattern)
+    return `${inputCount++}:v`
+  }
+
   /** Đầu vào riêng cho file âm thanh đã xử lý của clip video: đọc đúng đoạn cắt của clip. */
   const addDubInput = (clip: MediaClip, asset: MediaAsset): InputInfo => {
-    inputArgs.push('-ss', sec(clip.sourceIn), '-t', sec(Math.round(clip.duration * clip.speed)), '-i', asset.path)
+    inputArgs.push('-ss', sec(clip.sourceIn), '-t', sec(sourceSpanOf(clip)), '-i', asset.path)
     return { index: inputCount++, sourceOffset: 0, padStart: 0 }
   }
 
@@ -332,8 +360,12 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
       const srcH = asset.height ?? H
       const speed = clip.type === 'media' ? clip.speed : 1
       const timing = [
-        // Đưa mốc thời gian về 0, áp dụng tốc độ (nhanh gấp đôi = thời gian chia 2)
-        speed === 1 ? 'setpts=PTS-STARTPTS' : `setpts=(PTS-STARTPTS)/${speed}`,
+        // Đưa mốc thời gian về 0, áp dụng tốc độ (nhanh gấp đôi = thời gian chia 2); uốn cong → công thức theo khúc
+        clip.type === 'media' && clip.speedCurve
+          ? curveSetpts(clip, input, extBefore)
+          : speed === 1
+            ? 'setpts=PTS-STARTPTS'
+            : `setpts=(PTS-STARTPTS)/${speed}`,
         // File gốc không đủ phần trước/sau cho chuyển cảnh → giữ khung đầu / khung cuối
         ...(input.padStart > 0 ? [`tpad=start_mode=clone:start_duration=${sec(input.padStart)}`] : []),
         ...(extAfter > 0 ? [`tpad=stop_mode=clone:stop_duration=${sec(extAfter)}`] : [])
@@ -344,17 +376,24 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
       if (hasKeyframes(clip) || (clip.type === 'media' && hasClipAnim(clip))) {
         // Có keyframe: kích thước/vị trí/xoay/độ mờ tính lại mỗi khung hình (xem animatedLayerFilters)
         const anim = animatedLayerFilters(clip, srcW, srcH, W, H, fps, extBefore)
+        const colorFilters = clip.type === 'media' ? clipFfmpegFilters(clip) : []
+        const mask = addMaskInput(clip, extBefore, extAfter)
         const chain = [
           ...timing,
           ...anim.size,
-          ...(clip.type === 'media' ? clipFfmpegFilters(clip) : []),
+          ...colorFilters,
           ...fadeIn,
           ...anim.place,
           `setpts=PTS+${sec(layerFrom)}/TB`
         ]
         const layer = `v${layerIndex}`
         const out = `o${layerIndex}`
-        filters.push(`[${input.index}:v]${chain.join(',')}[${layer}]`)
+        filters.push(
+          ...layerStatements(clip, `${input.index}:v`, chain, timing.length, layer, opts, asset, undefined, mask === null ? null : {
+            label: mask,
+            at: timing.length + anim.size.length + colorFilters.length
+          })
+        )
         filters.push(
           `[${current}][${layer}]overlay=x='${slideX(0, W, tin, tout)}':y=0:eof_action=pass:repeatlast=0:` +
             `enable='between(t,${sec(layerFrom)},${sec(layerTo - 1)})'[${out}]`
@@ -376,11 +415,13 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
       const fitsFrame = x >= 0 && y >= 0 && x + box.w <= W && y + box.h <= H
       const zoomIn = tin?.kind === 'zoom' && fitsFrame
 
+      const colorFilters = clip.type === 'media' ? clipFfmpegFilters(clip) : []
+      const mask = addMaskInput(clip, extBefore, extAfter)
       const chain = [
         ...timing,
         `scale=${w}:${h}:flags=bicubic`,
         'format=rgba',
-        ...(clip.type === 'media' ? clipFfmpegFilters(clip) : []),
+        ...colorFilters,
         ...(p.rotation !== 0
           ? [`rotate=${p.rotation.toFixed(6)}:ow=rotw(${p.rotation.toFixed(6)}):oh=roth(${p.rotation.toFixed(6)}):c=none`]
           : []),
@@ -398,7 +439,13 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
       if (zoomIn) x = y = 0
       const layer = `v${layerIndex}`
       const out = `o${layerIndex}`
-      filters.push(`[${input.index}:v]${chain.join(',')}[${layer}]`)
+      // Chỉnh màu SAU khi thu về đúng cỡ hiển thị (h): nhanh hơn nhiều với video 4K, thông số tính theo tỉ lệ nên vẫn khớp preview
+      filters.push(
+        ...layerStatements(clip, `${input.index}:v`, chain, timing.length + 1, layer, opts, asset, h, mask === null ? null : {
+          label: mask,
+          at: timing.length + 2 + colorFilters.length
+        })
+      )
       // eof_action=pass: hết clip thì để lộ lớp bên dưới; enable: chỉ hiện trong khoảng của clip
       filters.push(
         `[${current}][${layer}]overlay=x='${slideX(x, W, tin, tout)}':y=${y}:eof_action=pass:repeatlast=0:` +
@@ -410,7 +457,10 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
   }
   filters.push(`[${current}]format=${opts.pixelFormat}[vout]`)
 
-  filters.push(...audioMixStatements(project, D, addInput, addDubInput))
+  // Clip làm đẹp: file đã vẽ lại không có tiếng → tiếng đọc riêng từ file gốc
+  const audioInput = (item: Item): InputInfo =>
+    opts.beautyRenders?.has(item.clip.id) && item.clip.type === 'media' ? addDubInput(item.clip, item.asset) : addInput(item)
+  filters.push(...audioMixStatements(project, D, audioInput, addDubInput))
 
   return {
     inputArgs,
@@ -449,12 +499,23 @@ function audioMixStatements(
       const input = dub ? addDubInput(clip, dub) : addInput({ clip, track, asset })
       const delayMs = Math.round(clip.start / 1000)
       const { fadeIn, fadeOut } = effectiveFades(clip)
+      let source = `[${input.index}:a]`
+      if (clip.speedCurve) {
+        // Uốn cong: chia đoạn gốc thành nhiều khúc, mỗi khúc một tốc độ (atempo giữ cao độ), rồi nối lại
+        const label = `c${audioLabels.length}`
+        filters.push(...curveAudio(clip, `${input.index}:a`, input.sourceOffset, label))
+        source = `[${label}]`
+      }
       const chain = [
         // Đầu vào có thể đọc dư phần trước/sau (cho chuyển cảnh hình) → tiếng chỉ lấy đúng đoạn của clip
-        `atrim=start=${sec(input.sourceOffset)}:duration=${sec(Math.round(clip.duration * clip.speed))}`,
-        'asetpts=PTS-STARTPTS',
-        'aformat=sample_rates=48000:channel_layouts=stereo',
-        ...atempoChain(clip.speed),
+        ...(clip.speedCurve
+          ? ['aformat=sample_rates=48000:channel_layouts=stereo']
+          : [
+              `atrim=start=${sec(input.sourceOffset)}:duration=${sec(sourceSpanOf(clip))}`,
+              'asetpts=PTS-STARTPTS',
+              'aformat=sample_rates=48000:channel_layouts=stereo',
+              ...atempoChain(clip.speed)
+            ]),
         // Âm lượng: có keyframe → tính lại mỗi khung âm thanh ("t" = giây tính từ đầu clip, giống volumeAt)
         ...(volumeKf.length > 0
           ? [`volume='${ffmpegValueExpr(clip, 'volume', 't')}':eval=frame`]
@@ -468,7 +529,7 @@ function audioMixStatements(
         `adelay=${delayMs}:all=1`
       ]
       const label = `a${audioLabels.length}`
-      filters.push(`[${input.index}:a]${chain.join(',')}[${label}]`)
+      filters.push(`${source}${chain.join(',')}[${label}]`)
       audioLabels.push(label)
     }
   }
@@ -497,9 +558,152 @@ export function buildAudioMixGraph(project: Project): Omit<ExportGraph, 'videoLa
   const inputArgs: string[] = []
   let inputCount = 0
   const read = (clip: MediaClip, asset: MediaAsset): InputInfo => {
-    inputArgs.push('-ss', sec(clip.sourceIn), '-t', sec(Math.round(clip.duration * clip.speed)), '-i', asset.path)
+    inputArgs.push('-ss', sec(clip.sourceIn), '-t', sec(sourceSpanOf(clip)), '-i', asset.path)
     return { index: inputCount++, sourceOffset: 0, padStart: 0 }
   }
   const filters = audioMixStatements(project, D, ({ clip, asset }) => read(clip as MediaClip, asset), read)
   return { inputArgs, filterGraph: filters.join(';\n'), audioLabel: 'aout', durationUs: D }
+}
+
+// ───────── Uốn cong tốc độ ─────────
+
+/** Số khúc khi xuất: hình đổi tốc độ theo 48 khúc (gần như liên tục), tiếng 24 khúc (mỗi khúc 1 atempo). */
+const CURVE_VIDEO_SEGMENTS = 48
+const CURVE_AUDIO_SEGMENTS = 24
+
+/**
+ * setpts cho clip uốn cong: thời gian khung hình trong lớp = thời gian đi tới vị trí đó trong file gốc
+ * (cộng từng khúc: độ dài khúc ÷ tốc độ khúc). Ngoài đoạn clip (phần dư cho chuyển cảnh): tốc độ 2 đầu.
+ * Kết quả khớp với preview (cùng đường cong, cùng bảng tích lũy).
+ */
+function curveSetpts(clip: MediaClip, input: InputInfo, extBefore: Micros): string {
+  const curve = clip.speedCurve!
+  const S = sourceSpanOf(clip) / MICROS_PER_SECOND
+  const v0 = curveSpeedAt(curve, 0)
+  const v1 = curveSpeedAt(curve, 1)
+  // X = vị trí trong file gốc tính từ sourceIn (giây)
+  const X = `((PTS-STARTPTS)*TB-${sec(input.sourceOffset)})`
+  const parts = [`min(${X},0)/${v0.toFixed(6)}`]
+  for (const seg of curveSegments(curve, CURVE_VIDEO_SEGMENTS)) {
+    const a = (seg.x0 * S).toFixed(6)
+    const w = ((seg.x1 - seg.x0) * S).toFixed(6)
+    parts.push(`clip(${X}-${a},0,${w})/${seg.speed.toFixed(6)}`)
+  }
+  parts.push(`max(${X}-${S.toFixed(6)},0)/${v1.toFixed(6)}`)
+  // Lớp bắt đầu sớm extBefore (chuyển cảnh); tpad phía sau thêm padStart nên trừ ra ở đây
+  const shift = (extBefore - input.padStart) / MICROS_PER_SECOND
+  return `setpts='(${parts.join('+')}+${shift.toFixed(6)})/TB'`
+}
+
+/** Tiếng của clip uốn cong: tách khúc → atempo từng khúc → nối. Trả về các chuỗi lọc, đầu ra [label]. */
+function curveAudio(clip: MediaClip, inLabel: string, sourceOffset: Micros, label: string): string[] {
+  const curve = clip.speedCurve!
+  const S = sourceSpanOf(clip)
+  const segs = curveSegments(curve, CURVE_AUDIO_SEGMENTS)
+  const out: string[] = [`[${inLabel}]asplit=${segs.length}${segs.map((_, k) => `[${label}s${k}]`).join('')}`]
+  segs.forEach((seg, k) => {
+    const start = sourceOffset + seg.x0 * S
+    const dur = (seg.x1 - seg.x0) * S
+    out.push(
+      `[${label}s${k}]atrim=start=${sec(Math.round(start))}:duration=${sec(Math.round(dur))},asetpts=PTS-STARTPTS,` +
+        `aformat=sample_rates=48000:channel_layouts=stereo,${atempoChain(seg.speed).join(',') || 'anull'}[${label}p${k}]`
+    )
+  })
+  out.push(`${segs.map((_, k) => `[${label}p${k}]`).join('')}concat=n=${segs.length}:v=0:a=1[${label}]`)
+  return out
+}
+
+// ───────── Điều chỉnh màu ─────────
+
+/**
+ * Chuỗi lọc của một lớp hình; clip có Điều chỉnh màu thì chèn phần màu NGAY SAU phần thời gian
+ * (áp lên khung hình gốc, trước khi thu phóng / xoay – giống thứ tự của preview).
+ * @param timingCount số bộ lọc đứng trước phần màu ở đầu `chain` (thời gian, có thể kèm bước thu phóng)
+ * @param scaledHeight chiều cao khung tại chỗ chèn (khi đã thu về cỡ hiển thị)
+ */
+function layerStatements(
+  clip: Clip,
+  inLabel: string,
+  chain: string[],
+  timingCount: number,
+  out: string,
+  opts: GraphOptions,
+  asset: MediaAsset,
+  scaledHeight?: number,
+  mask?: { label: string; at: number } | null
+): string[] {
+  const statements: string[] = []
+  let cur = inLabel
+  let rest = chain
+  let maskAt = mask?.at ?? 0
+  // Điều chỉnh màu: chèn sau phần thời gian (và bước thu phóng nếu có)
+  const grade = clip.type === 'media' ? clip.grade : null
+  if (grade && !isGradeEmpty(grade)) {
+    const frameH = scaledHeight ?? opts.beautyRenders?.get(clip.id)?.height ?? asset.height ?? 1080
+    const g = gradeStatements(inLabel, chain.slice(0, timingCount), grade, opts.gradeLuts?.get(clip.id) ?? null, frameH, `g${out}`)
+    statements.push(...g.statements)
+    cur = g.out
+    rest = chain.slice(timingCount)
+    maskAt -= timingCount
+  }
+  // Mặt nạ: ảnh xám co giãn theo lớp hình (scale2ref) rồi làm kênh trong suốt (alphamerge),
+  // chèn sau bước màu – trước xoay / độ mờ / chuyển cảnh (giống thứ tự của preview)
+  if (mask) {
+    const pre = rest.slice(0, maskAt)
+    statements.push(`[${cur}]${[...pre, 'format=rgba'].join(',')}[${out}mp]`)
+    statements.push(`[${mask.label}]format=gray[${out}mg]`)
+    statements.push(`[${out}mg][${out}mp]scale2ref[${out}mk][${out}mr]`)
+    statements.push(`[${out}mr][${out}mk]alphamerge[${out}ma]`)
+    cur = `${out}ma`
+    rest = rest.slice(maskAt)
+  }
+  statements.push(`[${cur}]${rest.join(',') || 'null'}[${out}]`)
+  return statements
+}
+
+/**
+ * Điều chỉnh màu bằng FFmpeg, cùng thứ tự với preview (renderer/src/engine/grade/GradeRenderer.ts):
+ * làm mờ → làm sắc nét → độ rõ nét (A + k·(A − mờ(A)), từng bước) → bảng màu 3D → hạt nhỏ → viền mờ dần.
+ * Làm trên RGB (gbrp) để công thức giống hệt shader.
+ */
+export function gradeStatements(
+  inLabel: string,
+  timing: string[],
+  grade: ColorGrade,
+  lutFile: string | null,
+  frameH: number,
+  uid: string
+): { statements: string[]; out: string } {
+  const sp = spatialParams(grade)
+  const sigma = (rel: number): string => Math.max(0.3, rel * frameH).toFixed(3)
+  const statements: string[] = []
+  let cur = inLabel
+  let chain = [...timing, 'format=gbrp']
+  let n = 0
+  const flush = (): void => {
+    const label = `${uid}s${n++}`
+    statements.push(`[${cur}]${chain.join(',') || 'null'}[${label}]`)
+    cur = label
+    chain = []
+  }
+  if (sp.blurSigma > 0) chain.push(`gblur=sigma=${sigma(sp.blurSigma)}`)
+  for (const [amount, rel] of [
+    [sp.sharpenAmount, sp.sharpenSigma],
+    [sp.clarityAmount, sp.claritySigma]
+  ]) {
+    if (amount <= 0) continue
+    flush()
+    const a = `${uid}a${n}`
+    const b = `${uid}b${n}`
+    const c = `${uid}c${n}`
+    statements.push(`[${cur}]split[${a}][${b}]`, `[${b}]gblur=sigma=${sigma(rel)}[${c}]`)
+    const label = `${uid}u${n++}`
+    statements.push(`[${a}][${c}]blend=all_expr='clip(A+(A-B)*${amount.toFixed(4)},0,255)'[${label}]`)
+    cur = label
+  }
+  if (lutFile && hasColorChanges(grade)) chain.push(`lut3d=file=${lutFile}:interp=trilinear`)
+  if (sp.grain > 0) chain.push(`noise=alls=${Math.max(1, Math.round(sp.grain * 255))}:allf=t+u`)
+  if (sp.vignette !== 0) chain.push(`vignette=angle=${Math.abs(sp.vignette).toFixed(4)}:mode=${sp.vignette > 0 ? 'forward' : 'backward'}:eval=init`)
+  flush()
+  return { statements, out: cur }
 }

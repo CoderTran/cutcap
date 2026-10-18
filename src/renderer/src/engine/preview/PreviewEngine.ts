@@ -13,15 +13,20 @@ import { placeLayer } from '@shared/render/geometry'
 import { projectDuration } from '@shared/timeline/clips'
 import { clipGainAt } from '@shared/timeline/clipProps'
 import { clipAnimAt } from '@shared/render/clipAnims'
-import { transformAt } from '@shared/timeline/keyframes'
+import { rateAt, sourceTimeAt } from '@shared/timeline/clipTime'
+import { maskAt, transformAt } from '@shared/timeline/keyframes'
 import { clampedSourceTime } from '@shared/timeline/transitions'
 import { timedClipsBetween, visualLayersAt, type TimedClip } from '@shared/timeline/evaluate'
+import { PREVIEW_ID, previewLoop, withTilePreview } from '@shared/timeline/tilePreview'
 import { editorStore } from '../../state/editorStore'
 import { mediaStore, pathKey } from '../../state/mediaStore'
 import { projectStore } from '../../state/projectStore'
 import { drawTextClip, type Rect } from '../text/drawText'
 import { findEffect } from '@shared/render/effects'
 import { EffectPainter } from '../effects/applyEffect'
+import { BeautyPreview } from '../beauty/beautyPreview'
+import { GradePreview } from '../grade/gradePreview'
+import { MaskPreview } from '../mask/maskPreview'
 import { MediaElementPool } from './MediaElementPool'
 
 /** Vị trí một lớp hình vừa vẽ (pixel canvas) – để bấm chọn và kéo trên khung preview. */
@@ -44,6 +49,11 @@ export class PreviewEngine {
   private readonly pool = new MediaElementPool(() => this.requestRender(), this.audio)
   private readonly unsubscribers: (() => void)[] = []
   private readonly effects = new EffectPainter()
+  private readonly beauty = new BeautyPreview(() => this.requestRender())
+  private readonly grade = new GradePreview()
+  private readonly masks = new MaskPreview()
+  /** Khung hình gần nhất của mỗi clip video – vẽ thay khi phần tử đang tua (tránh chớp đen). */
+  private readonly lastFrames = new Map<Id, { canvas: HTMLCanvasElement; time: number }>()
   private raf = 0
   private dirty = true
   private playing = false
@@ -71,7 +81,7 @@ export class PreviewEngine {
           this.layoutListener?.(this.layout)
           this.requestRender()
         }
-        if (s.filterPreview !== prev.filterPreview) this.requestRender()
+        if (s.filterPreview !== prev.filterPreview || s.tilePreview !== prev.tilePreview) this.requestRender()
         if (s.currentTime === prev.currentTime) return
         // Người dùng tự tua (bấm thước, phím mũi tên) trong lúc đang phát → đặt lại mốc đồng hồ
         if (this.playing && s.currentTime !== this.lastPublished) this.resetClock(s.currentTime)
@@ -92,6 +102,8 @@ export class PreviewEngine {
     if (duration === 0) return
     let t = editorStore.getState().currentTime
     if (t >= duration) t = 0 // đang ở cuối → phát lại từ đầu
+    // Bấm Phát: bỏ bản xem thử chữ / hiệu ứng (chuyển cảnh thì giữ – xem thử chuyển cảnh chính là phát một đoạn)
+    if (editorStore.getState().tilePreview?.kind === 'clip') editorStore.getState().setTilePreview(null)
     this.playing = true
     void this.audio.resume() // trình duyệt có thể tạm treo AudioContext khi chưa dùng
     this.resetClock(t)
@@ -150,7 +162,7 @@ export class PreviewEngine {
 
   private tick = (now: number): void => {
     this.raf = requestAnimationFrame(this.tick)
-    const project = projectStore.getState().project
+    let project = projectStore.getState().project
     let t = editorStore.getState().currentTime
 
     if (this.playing) {
@@ -163,6 +175,13 @@ export class PreviewEngine {
       } else {
         this.publish(t)
       }
+    }
+
+    // Đang chọn một ô (chưa thêm): vẽ dự án tạm có mục đó; chữ / hiệu ứng chạy lặp nên vẽ lại mỗi khung
+    const preview = editorStore.getState().tilePreview
+    if (preview) {
+      project = withTilePreview(project, preview, t, Math.round((now - preview.startedAt) * 1000))
+      if (preview.kind === 'clip' && previewLoop(preview.clip) > 0) this.dirty = true
     }
 
     this.syncMedia(project, t, now)
@@ -211,12 +230,16 @@ export class PreviewEngine {
       if (dub) this.pool.setGain(dub.key, gain)
 
       for (const m of dub ? [el, dub.el] : [el]) {
-        if (m.playbackRate !== item.clip.speed) m.playbackRate = item.clip.speed
+        // Uốn cong: tốc độ đổi liên tục theo vị trí trong clip (trình phát giữ cao độ giọng)
+        const rate = Math.round(rateAt(item.clip, t) * 100) / 100
+        if (Math.abs(m.playbackRate - rate) > 0.005) m.playbackRate = rate
         if (this.playing && !source.frozen) {
           if (m.paused) {
             m.currentTime = expected
             void m.play().catch(() => {}) // bị ngắt (vd. bấm dừng ngay) – bỏ qua
-          } else if (!m.seeking && Math.abs(m.currentTime - expected) > MAX_DRIFT_SEC) {
+          } else if (!m.seeking && Math.abs(m.currentTime - expected) > MAX_DRIFT_SEC * Math.max(1, rate)) {
+            // Lệch cho phép tăng theo tốc độ: ở 5× trình phát cần chút thời gian đuổi kịp – tua liên tục
+            // sẽ không bao giờ kịp (và mỗi lần tua mất hình trong chốc lát)
             m.currentTime = expected
           }
         } else {
@@ -263,6 +286,22 @@ export class PreviewEngine {
     return { key, el: this.pool.mediaFor(key, url, 'audio', now) }
   }
 
+  /** Chép khung hình hiện tại của video (chỉ khi đã sang khung mới) để dùng lại lúc phần tử đang tua. */
+  private rememberFrame(clipId: Id, el: HTMLVideoElement): void {
+    let entry = this.lastFrames.get(clipId)
+    if (entry && entry.time === el.currentTime && entry.canvas.width === el.videoWidth) return
+    if (!entry) {
+      entry = { canvas: document.createElement('canvas'), time: -1 }
+      this.lastFrames.set(clipId, entry)
+    }
+    if (entry.canvas.width !== el.videoWidth || entry.canvas.height !== el.videoHeight) {
+      entry.canvas.width = el.videoWidth
+      entry.canvas.height = el.videoHeight
+    }
+    entry.canvas.getContext('2d')!.drawImage(el, 0, 0)
+    entry.time = el.currentTime
+  }
+
   // ───────── Vẽ ─────────
 
   private draw(project: Project, t: Micros): void {
@@ -277,6 +316,7 @@ export class PreviewEngine {
 
     const layout: LayerBox[] = []
     const selected = editorStore.getState().selectedClipIds
+    const beautyVisible = new Set<Id>()
     for (const layer of visualLayersAt(project, t)) {
       const { clip, asset } = layer
       if (clip.type === 'effect') {
@@ -287,9 +327,9 @@ export class PreviewEngine {
       }
       if (clip.type === 'text') {
         // Đang dừng và đang chọn chữ → hiện chữ đầy đủ (bỏ qua hiệu ứng xuất hiện) để dễ chỉnh sửa
-        const editing = !this.playing && clip.animationIn !== 'none' && selected.includes(clip.id)
-        const rect = drawTextClip(ctx, editing ? { ...clip, animationIn: 'none' } : clip, W, H, t)
-        if (rect) layout.push({ clipId: clip.id, rect })
+        const editing = !this.playing && (clip.animationIn !== 'none' || !!clip.textIn || !!clip.textOut) && selected.includes(clip.id)
+        const rect = drawTextClip(ctx, editing ? { ...clip, animationIn: 'none', textIn: null, textOut: null } : clip, W, H, t)
+        if (rect && clip.id !== PREVIEW_ID) layout.push({ clipId: clip.id, rect })
         continue
       }
       if (!asset) continue
@@ -307,14 +347,40 @@ export class PreviewEngine {
         }
       } else {
         const el = this.pool.existing(clip.id)
-        // readyState >= 2: đã có ít nhất 1 khung hình để vẽ
-        if (el instanceof HTMLVideoElement && el.readyState >= 2 && el.videoWidth > 0) {
+        // readyState >= 2: đã có ít nhất 1 khung hình để vẽ. Đang tua thì phần tử chưa có hình mới
+        // → vẽ lại khung hình gần nhất của clip (không chớp đen khi tua / khi đuổi theo tốc độ cao)
+        if (el instanceof HTMLVideoElement && el.readyState >= 2 && el.videoWidth > 0 && !el.seeking) {
           source = el
           srcW = el.videoWidth
           srcH = el.videoHeight
+          this.rememberFrame(clip.id, el)
+        } else {
+          const last = this.lastFrames.get(clip.id)
+          if (last) {
+            source = last.canvas
+            srcW = last.canvas.width
+            srcH = last.canvas.height
+          }
         }
       }
       if (!source) continue
+      beautyVisible.add(clip.id)
+
+      // Làm đẹp (nhận diện mặt + làm mịn, trắng da…): thay nguồn bằng khung hình đã làm đẹp, giữ nguyên kích thước gốc
+      if (clip.type === 'media' && (clip.beauty || clip.faceShape)) {
+        const frameKey = source instanceof HTMLVideoElement ? source.currentTime : 0
+        const pretty = this.beauty.apply(clip.id, clip.beauty, clip.faceShape, source, srcW, srcH, frameKey)
+        if (pretty) source = pretty
+      }
+      // Điều chỉnh màu (sau làm đẹp – cùng thứ tự với lúc xuất)
+      if (clip.type === 'media' && clip.grade) {
+        const frameKey = layer.asset?.kind === 'video' ? sourceTimeAt(clip, t) / MICROS_PER_SECOND : 0
+        const graded = this.grade.apply(clip.id, clip.grade, source, srcW, srcH, frameKey)
+        if (graded) source = graded
+      }
+      // Mặt nạ: phần ngoài vùng giữ lại trong suốt (lộ track bên dưới) – gắn theo khung hình của clip
+      const mask = clip.type === 'media' ? maskAt(clip, t) : null
+      if (mask) source = this.masks.apply(clip.id, mask, source, srcW, srcH)
 
       // Biến đổi tại t (keyframe) + hiệu ứng động Vào/Ra/Kết hợp cộng dồn lên trên (giống khi xuất)
       const tf = transformAt(clip, t)
@@ -353,6 +419,10 @@ export class PreviewEngine {
       ctx.restore()
       layout.push({ clipId: clip.id, rect: { x: p.cx - p.width / 2, y: p.cy - p.height / 2, w: p.width, h: p.height } })
     }
+    this.beauty.sweep(beautyVisible)
+    this.grade.sweep(beautyVisible)
+    this.masks.sweep(beautyVisible)
+    for (const id of this.lastFrames.keys()) if (!beautyVisible.has(id)) this.lastFrames.delete(id)
     this.layout = layout
     this.layoutListener?.(layout)
   }

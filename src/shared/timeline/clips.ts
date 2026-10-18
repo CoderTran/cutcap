@@ -21,7 +21,8 @@ export function defaultTextStyle(): TextStyle {
     align: 'center',
     strokeColor: '#000000',
     strokeWidth: 4,
-    backgroundColor: null
+    backgroundColor: null,
+    fx: null
   }
 }
 
@@ -56,6 +57,9 @@ export function createTextClip(start: Micros, text: string): TextClip {
     // Giống CapCut: chữ mới không có hiệu ứng, để vừa thêm là thấy ngay trên khung Xem trước
     animationIn: 'none',
     animationDuration: 500_000,
+    textIn: null,
+    textOut: null,
+    textLoop: null,
     caption: false,
     keyframes: {}
   }
@@ -103,6 +107,11 @@ export function createMediaClip(asset: MediaAsset, start: Micros): MediaClip {
     audioFx: null,
     audioAssetId: null,
     loudnorm: null,
+    beauty: null,
+    faceShape: null,
+    speedCurve: null,
+    grade: null,
+    mask: null,
     keyframes: {}
   }
 }

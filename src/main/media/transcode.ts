@@ -1,10 +1,13 @@
 // Quyết định file nào cần bản proxy, và dựng lệnh ffmpeg cho thumbnail / proxy.
 // Toàn bộ là hàm thuần (chỉ tạo mảng tham số), nên test được không cần chạy ffmpeg.
+import type { PreviewQuality } from '@shared/ipc'
 import { extensionOf } from '@shared/media/formats'
 import type { ProbeInfo } from './probe'
 
-/** Chiều cao (cạnh ngắn) của video proxy. 540p đủ nét cho khung preview mà rất nhẹ. */
+/** Cạnh ngắn mặc định của video proxy (mức "Thấp"): 540p rất nhẹ, phát mượt nhất. */
 export const PROXY_SHORT_SIDE = 540
+/** Cạnh ngắn của bản proxy theo chất lượng Xem trước ("Đầy đủ" mà file gốc không phát được → dùng 1080p). */
+export const PROXY_SHORT_SIDES: Record<PreviewQuality, number> = { full: 1080, high: 1080, medium: 720, low: 540 }
 export const THUMBNAIL_HEIGHT = 180
 
 /** Codec âm thanh mà Chromium phát được trực tiếp. */
@@ -41,9 +44,24 @@ export function proxyNeeded(info: ProbeInfo, filePath: string): ProxyKind | null
   }
 }
 
-/** Đuôi file của bản proxy theo loại. */
-export function proxyFileName(kind: ProxyKind): string {
-  return kind === 'video' ? 'proxy.mp4' : kind === 'audio' ? 'proxy.m4a' : 'proxy.png'
+/**
+ * Chất lượng "Đầy đủ": phát thẳng file gốc kể cả 4K, miễn là Chromium giải mã được
+ * (H.264 8-bit trong MP4/MOV, âm thanh phát được). yuvj420p = yuv420p "dải màu đầy đủ" của máy ảnh / điện thoại.
+ */
+export function canPlayOriginal(info: ProbeInfo, filePath: string): boolean {
+  return (
+    info.kind === 'video' &&
+    ['mp4', 'mov', 'm4v'].includes(extensionOf(filePath)) &&
+    info.videoCodec === 'h264' &&
+    (info.pixelFormat === 'yuv420p' || info.pixelFormat === 'yuvj420p') &&
+    (info.audioCodec === null || PLAYABLE_AUDIO.has(info.audioCodec))
+  )
+}
+
+/** Tên file proxy. Video 540p giữ tên cũ "proxy.mp4" để dùng lại cache đã tạo trước đây. */
+export function proxyFileName(kind: ProxyKind, shortSide = PROXY_SHORT_SIDE): string {
+  if (kind === 'video') return shortSide === PROXY_SHORT_SIDE ? 'proxy.mp4' : `proxy-${shortSide}.mp4`
+  return kind === 'audio' ? 'proxy.m4a' : 'proxy.png'
 }
 
 /**
@@ -187,7 +205,7 @@ export function voiceArgs(src: string, dest: string, af: string): string[] {
  * Lệnh tạo proxy. Ghi tiến trình ra stdout ("-progress pipe:1") để hiện thanh phần trăm.
  * @param dest đường dẫn file tạm; caller đổi tên sau khi xong (để không bao giờ dùng nhầm file dở dang)
  */
-export function proxyArgs(kind: ProxyKind, src: string, dest: string): string[] {
+export function proxyArgs(kind: ProxyKind, src: string, dest: string, shortSide = PROXY_SHORT_SIDE): string[] {
   const common = ['-hide_banner', '-loglevel', 'error', '-y', '-nostats', '-progress', 'pipe:1', '-i', src]
   switch (kind) {
     case 'video':
@@ -195,10 +213,11 @@ export function proxyArgs(kind: ProxyKind, src: string, dest: string): string[] 
         ...common,
         '-map', '0:v:0',
         '-map', '0:a:0?', // "?" = có âm thanh thì lấy, không có cũng không lỗi
-        '-vf', scaleShortSide(PROXY_SHORT_SIDE),
+        '-vf', scaleShortSide(shortSide),
         '-c:v', 'libx264',
         '-preset', 'veryfast',
-        '-crf', '26',
+        // Bản nét hơn (720p/1080p) thì giữ chất lượng cao hơn; 540p ưu tiên nhẹ
+        '-crf', shortSide > PROXY_SHORT_SIDE ? '22' : '26',
         '-pix_fmt', 'yuv420p', // 8-bit: Chromium phát được cả khi gốc là 10-bit/HDR
         '-g', '15', // keyframe dày → tua (seek) trong preview nhanh
         '-c:a', 'aac',

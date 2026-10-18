@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Icon, type IconName } from '../icons'
 import { MediaBin } from '../MediaBin/MediaBin'
+import { AudioTab } from './AudioTab'
 import { EffectsTab } from './EffectsTab'
 import { FiltersTab } from './FiltersTab'
 import { TextTab } from './TextTab'
@@ -36,7 +37,7 @@ export function LeftPanel(): React.JSX.Element {
       </nav>
       <div className="left-content">
         {tab === 'media' && <MediaBin />}
-        {tab === 'audio' && <MediaBin only="audio" />}
+        {tab === 'audio' && <AudioTab />}
         {tab === 'text' && <TextTab />}
         {tab === 'effects' && <EffectsTab />}
         {tab === 'transitions' && <TransitionsTab />}

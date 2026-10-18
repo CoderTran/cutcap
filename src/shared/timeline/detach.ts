@@ -33,6 +33,7 @@ export function detachAudio(draft: Project, clipId: Id, audioAsset: MediaAsset):
     duration: video.duration,
     sourceIn: video.sourceIn,
     speed: video.speed,
+    speedCurve: video.speedCurve,
     volume: video.volume,
     fadeIn: video.fadeIn,
     fadeOut: video.fadeOut

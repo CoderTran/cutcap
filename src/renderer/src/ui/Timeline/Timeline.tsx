@@ -13,6 +13,8 @@ import type { Clip, Id, MediaAsset, Track } from '@shared/project/schema'
 import { MICROS_PER_SECOND, formatDuration } from '@shared/project/time'
 import { DEFAULT_IMAGE_DURATION, clipAssetId, projectDuration, resolveDrop, type DropTarget } from '@shared/timeline/clips'
 import { clampZoom, pxToTime, timeToPx } from '@shared/timeline/ruler'
+import { magnetInsertStart, mainTrack } from '@shared/timeline/magnet'
+import { NEW_TRACK_ID } from '@shared/timeline/edit'
 import { collectSnapPoints, snapSpan } from '@shared/timeline/snap'
 import { editorStore, useEditorStore } from '../../state/editorStore'
 import { projectStore, useProjectStore } from '../../state/projectStore'
@@ -74,6 +76,7 @@ export function Timeline(): React.JSX.Element {
 
   const tracks = project.tracks
   const labels = useTrackLabels(tracks)
+  const mainId = mainTrack(project)?.id
   const offsets = useMemo(() => trackOffsets(tracks), [tracks])
   const tracksHeight = tracks.reduce((h, tr) => h + trackHeight(tr), 0)
   const duration = projectDuration(project)
@@ -194,7 +197,18 @@ export function Timeline(): React.JSX.Element {
     const points = collectSnapPoints(projectStore.getState().project, editorStore.getState().currentTime)
     const threshold = editorStore.getState().snapping ? pxToTime(SNAP_PX, pps) : 0
     const snapped = snapSpan(Math.max(0, rawStart), clipDuration, points, threshold)
-    const target = resolveDrop(projectStore.getState().project, asset, trackId, snapped.start)
+    const project = projectStore.getState().project
+    // Hút vào đoạn chính: thả vào track chính → bóng nằm ở mối nối sẽ chèn vào
+    const main = editorStore.getState().magnet ? mainTrack(project) : undefined
+    if (main && main.id === trackId && asset.kind !== 'audio')
+      return {
+        trackId: main.id,
+        kind: main.kind,
+        start: magnetInsertStart(main, snapped.start, clipDuration),
+        duration: clipDuration,
+        snappedTo: null
+      }
+    const target = resolveDrop(project, asset, trackId, snapped.start)
     return { ...target, duration: clipDuration, snappedTo: snapped.snappedTo }
   }
 
@@ -267,7 +281,7 @@ export function Timeline(): React.JSX.Element {
 
           {tracks.map((track) => (
             <div key={track.id} className={`tl-row ${track.hidden ? 'hidden' : ''}`}>
-              <TrackHeader track={track} label={labels.get(track.id) ?? ''} />
+              <TrackHeader track={track} label={labels.get(track.id) ?? ''} isMain={track.id === mainId} />
               <div
                 className={`tl-lane kind-${track.kind} ${track.locked ? 'locked' : ''}`}
                 style={{ width: laneWidth, height: trackHeight(track) }}
@@ -309,7 +323,7 @@ export function Timeline(): React.JSX.Element {
           {dropPreview &&
             (ghostNewTrack ? (
               <div
-                className="tl-drop-newtrack"
+                className={`tl-drop-newtrack ${ghostTop === 0 ? 'below' : ''}`}
                 style={{ top: RULER_HEIGHT + ghostTop - 1, left: HEADER_WIDTH + timeToPx(dropPreview.start, pps) }}
               >
                 <span>+ {t('timeline.newTrack', { kind: t(`track.kind.${dropPreview.kind}`) })}</span>
@@ -327,6 +341,15 @@ export function Timeline(): React.JSX.Element {
             ))}
           {/* Bóng của các clip đang kéo/cắt mép */}
           {clipDrag?.ghosts.map((g) => {
+            if (g.trackId === NEW_TRACK_ID && clipDrag.newTrack) {
+              // Kéo ra ngoài các track: vạch "+ Track mới" ở chỗ sẽ chèn track
+              const at = clipDrag.newTrack.index < tracks.length ? offsets[clipDrag.newTrack.index] : tracksHeight
+              return (
+                <div key={g.clipId} className={`tl-drop-newtrack ${at === 0 ? 'below' : ''}`} style={{ top: RULER_HEIGHT + at - 1, left: HEADER_WIDTH + timeToPx(g.start, pps) }}>
+                  <span>+ {t('timeline.newTrack', { kind: t(`track.kind.${clipDrag.newTrack.kind}`) })}</span>
+                </div>
+              )
+            }
             const index = tracks.findIndex((tr) => tr.id === g.trackId)
             if (index < 0) return null
             return (

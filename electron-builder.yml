@@ -29,6 +29,12 @@ extraResources:
     to: models
     filter:
       - '*.rnnn'
+  # Hiệu ứng âm thanh có sẵn (Kenney.nl, CC0) → <thư mục cài>/resources/sfx/kenney/
+  - from: resources/sfx
+    to: sfx
+    filter:
+      - '**/*.ogg'
+      - '**/License.txt'
   # whisper.cpp + mô hình dò tiếng nói cho "Phụ đề tự động" → <thư mục cài>/resources/whisper/
   # (mô hình nhận dạng ~190 MB không đóng gói – app tự tải khi dùng lần đầu)
   - from: resources/whisper

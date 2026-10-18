@@ -6,10 +6,33 @@
 // - Thuộc tính chưa có keyframe nào → dùng giá trị thường (clip.transform / clip.volume).
 //
 // Dùng CHUNG cho preview (vẽ canvas, âm lượng) và xuất video (biểu thức FFmpeg tạo từ cùng dữ liệu).
-import type { Clip, Keyframe, KeyframeProp, MediaClip, Project, Transform } from '../project/schema'
+import {
+  KEYFRAME_PROPS,
+  type Clip,
+  type Keyframe,
+  type KeyframeProp,
+  type MediaClip,
+  type Project,
+  type Transform
+} from '../project/schema'
+import type { ClipMask } from '../render/mask'
 import type { Micros } from '../project/time'
 
 export const TRANSFORM_PROPS = ['scale', 'x', 'y', 'rotation', 'opacity'] as const satisfies readonly KeyframeProp[]
+
+/** Thuộc tính keyframe của mặt nạ → trường tương ứng trong clip.mask. */
+export const MASK_PROP_FIELDS = {
+  maskX: 'x',
+  maskY: 'y',
+  maskRotation: 'rotation',
+  maskWidth: 'width',
+  maskHeight: 'height',
+  maskFeather: 'feather',
+  maskRoundness: 'roundness'
+} as const satisfies Partial<Record<KeyframeProp, keyof ClipMask>>
+export type MaskProp = keyof typeof MASK_PROP_FIELDS
+export const MASK_PROPS = Object.keys(MASK_PROP_FIELDS) as MaskProp[]
+const isMaskProp = (p: KeyframeProp): p is MaskProp => p in MASK_PROP_FIELDS
 
 /** Hai keyframe cách nhau ít hơn mức này coi là cùng một chỗ (nửa khung hình ở 30 fps). */
 export const KEYFRAME_TOLERANCE_US = 16_000
@@ -21,7 +44,14 @@ const LIMITS: Record<KeyframeProp, [number, number]> = {
   y: [-0.5, 1.5],
   rotation: [-3600, 3600],
   opacity: [0, 1],
-  volume: [0, 2]
+  volume: [0, 2],
+  maskX: [-0.5, 1.5],
+  maskY: [-0.5, 1.5],
+  maskRotation: [-3600, 3600],
+  maskWidth: [0.01, 3],
+  maskHeight: [0.01, 3],
+  maskFeather: [0, 100],
+  maskRoundness: [0, 100]
 }
 
 export function clampProp(prop: KeyframeProp, value: number): number {
@@ -29,13 +59,15 @@ export function clampProp(prop: KeyframeProp, value: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
-/** Thuộc tính này có áp dụng cho clip không (âm lượng chỉ có ở clip media). */
+/** Thuộc tính này có áp dụng cho clip không (âm lượng: clip media; mặt nạ: clip media đang có mặt nạ). */
 export function propApplies(clip: Clip, prop: KeyframeProp): boolean {
+  if (isMaskProp(prop)) return clip.type === 'media' && clip.mask !== null
   return prop === 'volume' ? clip.type === 'media' : true
 }
 
 /** Giá trị thường (không keyframe) của thuộc tính. */
 export function baseValue(clip: Clip, prop: KeyframeProp): number {
+  if (isMaskProp(prop)) return clip.type === 'media' && clip.mask ? clip.mask[MASK_PROP_FIELDS[prop]] : 0
   if (prop === 'volume') return clip.type === 'media' ? clip.volume : 1
   return clip.transform[prop]
 }
@@ -85,8 +117,17 @@ export function volumeAt(clip: MediaClip, t: Micros): number {
   return valueAt(clip, 'volume', t)
 }
 
+/** Mặt nạ của clip tại thời điểm t (đã nội suy keyframe), hoặc null nếu clip không có mặt nạ. */
+export function maskAt(clip: MediaClip, t: Micros): ClipMask | null {
+  if (!clip.mask) return null
+  if (!hasKeyframes(clip, MASK_PROPS)) return clip.mask
+  const m = { ...clip.mask }
+  for (const p of MASK_PROPS) m[MASK_PROP_FIELDS[p]] = valueAt(clip, p, t)
+  return m
+}
+
 /** Mọi thời điểm có keyframe (µs từ đầu clip, không trùng) – để vẽ dấu ◆ trên timeline. */
-export function keyframeTimes(clip: Clip, props: readonly KeyframeProp[] = [...TRANSFORM_PROPS, 'volume']): Micros[] {
+export function keyframeTimes(clip: Clip, props: readonly KeyframeProp[] = KEYFRAME_PROPS): Micros[] {
   const times: Micros[] = []
   for (const p of props) {
     for (const k of keyframesOf(clip, p)) {
@@ -133,7 +174,9 @@ function upsert(clip: Clip, prop: KeyframeProp, local: Micros, value: number): v
 export function setAnimatedValue(clip: Clip, prop: KeyframeProp, value: number, t: Micros): void {
   if (!propApplies(clip, prop)) return
   if (keyframesOf(clip, prop).length > 0) return upsert(clip, prop, t - clip.start, value)
-  if (prop === 'volume') {
+  if (isMaskProp(prop)) {
+    if (clip.type === 'media' && clip.mask) clip.mask[MASK_PROP_FIELDS[prop]] = clampProp(prop, value)
+  } else if (prop === 'volume') {
     if (clip.type === 'media') clip.volume = clampProp(prop, value)
   } else {
     clip.transform[prop] = clampProp(prop, value)
@@ -238,9 +281,7 @@ export function ffmpegValueExpr(clip: Clip, prop: KeyframeProp, timeExpr: string
     const a = kfs[i - 1]
     const b = kfs[i]
     const seg =
-      b.time === a.time
-        ? num(b.value)
-        : `${num(a.value)}+(${num(b.value - a.value)})*(${timeExpr}-${s(a.time)})/${s(b.time - a.time)}`
+      b.time === a.time ? num(b.value) : `${num(a.value)}+(${num(b.value - a.value)})*(${timeExpr}-${s(a.time)})/${s(b.time - a.time)}`
     expr = `if(lt(${timeExpr},${s(b.time)}),${seg},${expr})`
   }
   return `if(lt(${timeExpr},${s(kfs[0].time)}),${num(kfs[0].value)},${expr})`

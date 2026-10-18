@@ -1,8 +1,9 @@
-// Phần tính toán (không vẽ) cho clip chữ: cỡ chữ theo khung hình, trạng thái hiệu ứng xuất hiện.
+// Phần tính toán (không vẽ) cho clip chữ: cỡ chữ theo khung hình, số khung hiệu ứng khi xuất.
+// Hiệu ứng động (Vào / Ra / Vòng lặp): shared/render/textAnims.ts.
 // Phần vẽ thật nằm ở renderer/src/engine/text/drawText.ts (cần canvas của trình duyệt).
 import { hasKeyframes } from '../timeline/keyframes'
+import { textAnimSpans } from './textAnims'
 import type { TextClip, TextStyle } from '../project/schema'
-import type { Micros } from '../project/time'
 
 /** Khoảng cách dòng = 1.25 × cỡ chữ. */
 export const LINE_HEIGHT = 1.25
@@ -31,44 +32,15 @@ export function splitGraphemes(text: string): string[] {
   return [...segmenter.segment(text)].map((s) => s.segment)
 }
 
-const easeOutCubic = (p: number): number => 1 - (1 - p) ** 3
-
-export interface TextAnimationState {
-  /** Nhân vào độ mờ. */
-  alpha: number
-  /** Dịch xuống (tính theo số lần cỡ chữ) – dùng cho "trượt lên". */
-  offsetY: number
-  /** Nhân vào kích thước – dùng cho "phóng to". */
-  scale: number
-  /** Số ký tự đang hiện (hiệu ứng gõ chữ); null = hiện hết. */
-  visibleGraphemes: number | null
-}
-
-/** Trạng thái hiệu ứng xuất hiện của clip chữ tại thời điểm t. */
-export function textAnimationAt(clip: TextClip, t: Micros): TextAnimationState {
-  const none: TextAnimationState = { alpha: 1, offsetY: 0, scale: 1, visibleGraphemes: null }
-  if (clip.animationIn === 'none' || clip.animationDuration <= 0) return none
-  const raw = Math.min(1, Math.max(0, (t - clip.start) / clip.animationDuration))
-  const p = easeOutCubic(raw)
-  switch (clip.animationIn) {
-    case 'fade':
-      return { ...none, alpha: p }
-    case 'slide-up':
-      return { ...none, alpha: p, offsetY: (1 - p) * 1.2 }
-    case 'zoom':
-      return { ...none, alpha: p, scale: 0.4 + 0.6 * p }
-    case 'typewriter':
-      // Gõ chữ đều tay (không dùng easing), làm tròn xuống để ký tự cuối hiện đúng lúc kết thúc
-      return { ...none, visibleGraphemes: Math.floor(raw * splitGraphemes(clip.text).length) }
-  }
-}
-
 /**
  * Số khung hình phải vẽ riêng khi xuất video (0 = chỉ cần 1 ảnh tĩnh).
  * Chữ có keyframe (vị trí, kích thước…) thay đổi suốt clip → vẽ MỌI khung hình.
  */
 export function animationFrameCount(clip: TextClip, fps: number): number {
-  if (hasKeyframes(clip)) return Math.floor((clip.duration / 1e6) * fps)
-  if (clip.animationIn === 'none' || clip.animationDuration <= 0) return 0
-  return Math.min(Math.ceil((Math.min(clip.animationDuration, clip.duration) / 1e6) * fps), Math.floor((clip.duration / 1e6) * fps))
+  const all = Math.floor((clip.duration / 1e6) * fps)
+  // Có keyframe / hiệu ứng Ra / Vòng lặp → thay đổi suốt clip (hoặc ở cuối) → vẽ MỌI khung hình
+  if (hasKeyframes(clip) || clip.textOut || clip.textLoop) return all
+  const { inUs } = textAnimSpans(clip)
+  if (inUs <= 0) return 0
+  return Math.min(Math.ceil((inUs / 1e6) * fps), all)
 }

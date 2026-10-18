@@ -21,9 +21,11 @@ interface Props {
   extra?: ReactNode
   /** Hướng dẫn: hiện dấu "?" cạnh nhãn, rê chuột mới hiện. */
   help?: string
+  /** Nền thanh trượt (CSS background), vd. dải màu xanh → vàng của Nhiệt độ màu. */
+  track?: string
 }
 
-export function SliderField({ label, display, value, min, max, step, disabled, onChange, onReset, extra, help }: Props): React.JSX.Element {
+export function SliderField({ label, display, value, min, max, step, disabled, onChange, onReset, extra, help, track }: Props): React.JSX.Element {
   const session = useRef('')
   const newSession = (): void => {
     session.current = `${label}:${performance.now()}`
@@ -46,6 +48,8 @@ export function SliderField({ label, display, value, min, max, step, disabled, o
         step={step}
         value={value}
         disabled={disabled}
+        className={track ? 'track-gradient' : undefined}
+        style={track ? ({ '--track': track } as React.CSSProperties) : undefined}
         onPointerDown={newSession}
         // Kéo chuột xong thì bỏ focus: phím tắt (Space, Ctrl+Z, mũi tên…) quay về timeline
         onPointerUp={(e) => e.currentTarget.blur()}

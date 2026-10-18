@@ -7,7 +7,8 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import type { Id, Track } from '@shared/project/schema'
 import type { Micros } from '@shared/project/time'
 import { clipEnd, findClip } from '@shared/timeline/clips'
-import { editableClipIds, planMove, trimBounds, type ClipMove } from '@shared/timeline/edit'
+import { editableClipIds, planMove, trimBounds, type ClipMove, type MovePlan, type MoveTarget } from '@shared/timeline/edit'
+import { planMagnetMove } from '@shared/timeline/magnet'
 import { pxToTime } from '@shared/timeline/ruler'
 import { collectSnapPoints, snapSpan } from '@shared/timeline/snap'
 import { editorStore } from '../../state/editorStore'
@@ -28,6 +29,8 @@ export interface ClipGhost {
 export interface ClipDragPreview {
   mode: DragMode
   ghosts: ClipGhost[]
+  /** Thả bây giờ sẽ tạo track mới ở vị trí này (chỉ số trong danh sách track). */
+  newTrack?: MovePlan['newTrack']
   valid: boolean
   snappedTo: Micros | null
 }
@@ -47,6 +50,8 @@ interface Session {
 
 /** Chuột phải di chuyển quá bấy nhiêu pixel mới tính là kéo (tránh bấm chọn mà clip bị xê dịch). */
 const DRAG_THRESHOLD_PX = 3
+/** Kéo ra quá mép trên track đầu / mép dưới track cuối bấy nhiêu pixel mới tạo track mới. */
+const NEW_TRACK_MARGIN_PX = 6
 
 export function useClipDrag(
   contentRef: RefObject<HTMLDivElement | null>,
@@ -64,12 +69,15 @@ export function useClipDrag(
   const layout = useRef({ tracks, offsets })
   layout.current = { tracks, offsets }
 
-  /** Track nằm dưới con trỏ chuột (null nếu không có). */
-  const trackAt = (clientY: number): Id | null => {
+  /** Track nằm dưới con trỏ chuột; phía trên track đầu / dưới track cuối → tạo track mới. */
+  const trackAt = (clientY: number): MoveTarget => {
     const content = contentRef.current?.getBoundingClientRect()
     if (!content) return null
     const y = clientY - content.top - RULER_HEIGHT
     const { tracks: ts, offsets: os } = layout.current
+    if (ts.length === 0) return null
+    if (y < -NEW_TRACK_MARGIN_PX) return 'new-top'
+    if (y >= os[ts.length - 1] + trackHeight(ts[ts.length - 1]) + NEW_TRACK_MARGIN_PX) return 'new-bottom'
     const index = os.findIndex((top, i) => y >= top && y < top + trackHeight(ts[i]))
     return index >= 0 ? ts[index].id : null
   }
@@ -83,7 +91,7 @@ export function useClipDrag(
     s.moved = true
 
     const project = projectStore.getState().project
-    const { pxPerSecond, currentTime, snapping } = editorStore.getState()
+    const { pxPerSecond, currentTime, snapping, magnet } = editorStore.getState()
     const dt = pxToTime(dx, pxPerSecond)
     const threshold = snapping ? pxToTime(SNAP_PX, pxPerSecond) : 0
     const points = collectSnapPoints(project, currentTime, s.clipIds)
@@ -93,13 +101,13 @@ export function useClipDrag(
     if (s.mode === 'move') {
       const snapped = snapSpan(s.originStart + dt, found.clip.duration, points, threshold)
       const target = s.clipIds.length === 1 ? trackAt(e.clientY) : null
-      const plan = planMove(project, s.clipIds, snapped.start - s.originStart, target)
+      const plan = (magnet ? planMagnetMove : planMove)(project, s.clipIds, snapped.start - s.originStart, target)
       const ghosts = plan.moves.map((m: ClipMove) => ({
         ...m,
         duration: findClip(project, m.clipId)!.clip.duration
       }))
-      setPreview({ mode: 'move', ghosts, valid: plan.valid, snappedTo: snapped.snappedTo })
-      s.commit = plan.valid ? () => moveClips(plan.moves) : null
+      setPreview({ mode: 'move', ghosts, valid: plan.valid, snappedTo: snapped.snappedTo, newTrack: plan.newTrack })
+      s.commit = plan.valid ? () => moveClips(plan.moves, plan.newTrack) : null
       return
     }
 

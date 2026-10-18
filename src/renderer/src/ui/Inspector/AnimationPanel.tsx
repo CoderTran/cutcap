@@ -8,6 +8,8 @@ import { animIds, clipAnimAt, type AnimKind } from '@shared/render/clipAnims'
 import { createMediaClip } from '@shared/timeline/clips'
 import { THUMB_H, THUMB_W, sampleScene } from '../../engine/effects/sampleScene'
 import { MIN_ANIM_US, maxAnimUs, setClipAnim, setClipAnimDuration } from '../../state/animActions'
+import { useFavorites } from '../../state/favoritesStore'
+import { FavoriteFilter, FavoriteStar } from '../Favorites'
 import { Icon } from '../icons'
 import { ComboRangeSlider } from './ComboRangeSlider'
 import { SliderField } from './SliderField'
@@ -103,6 +105,11 @@ export function AnimationPanel({ clip, disabled }: { clip: MediaClip; disabled: 
   const current = clip[FIELD[kind]]
   const seconds = (us: number): string => `${(us / MICROS_PER_SECOND).toFixed(1)}s`
   const max = maxAnimUs(clip, kind)
+  // ★ Yêu thích: mã dạng "in:fade", "out:…", "combo:…"
+  const [onlyFavs, setOnlyFavs] = useState(false)
+  const favs = useFavorites('anim')
+  const kindFavs = favs.filter((f) => f.startsWith(`${kind}:`)).map((f) => f.slice(kind.length + 1))
+  const ids = onlyFavs ? kindFavs.filter((id) => animIds(kind).includes(id)) : animIds(kind)
 
   return (
     <div className="form">
@@ -116,12 +123,16 @@ export function AnimationPanel({ clip, disabled }: { clip: MediaClip; disabled: 
         ))}
       </div>
 
+      <FavoriteFilter only={onlyFavs} count={kindFavs.length} onChange={setOnlyFavs} />
+      {onlyFavs && ids.length === 0 && <p className="hint">{t('favorites.empty')}</p>}
       <div className="preset-grid anim-grid">
-        <button className={`preset-tile ${!current ? 'active' : ''}`} disabled={disabled} onClick={() => setClipAnim(clip.id, kind, null)}>
-          <AnimThumb kind={kind} id={null} />
-          <span className="preset-name">{t('anim.none')}</span>
-        </button>
-        {animIds(kind).map((id) => (
+        {!onlyFavs && (
+          <button className={`preset-tile ${!current ? 'active' : ''}`} disabled={disabled} onClick={() => setClipAnim(clip.id, kind, null)}>
+            <AnimThumb kind={kind} id={null} />
+            <span className="preset-name">{t('anim.none')}</span>
+          </button>
+        )}
+        {ids.map((id) => (
           <button
             key={id}
             className={`preset-tile ${current?.id === id ? 'active' : ''}`}
@@ -136,6 +147,7 @@ export function AnimationPanel({ clip, disabled }: { clip: MediaClip; disabled: 
               </span>
             )}
             <span className="preset-name">{t(`anim.names.${kind}.${id}`)}</span>
+            <FavoriteStar kind="anim" id={`${kind}:${id}`} />
           </button>
         ))}
       </div>

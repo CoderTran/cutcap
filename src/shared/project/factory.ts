@@ -52,6 +52,7 @@ export function createEmptyProject(name: string, now: Date = new Date()): Projec
     updatedAt: iso,
     settings: defaultSettings(),
     assets: {},
-    tracks: [createTrack('video')]
+    tracks: [createTrack('video')],
+    cover: null
   }
 }

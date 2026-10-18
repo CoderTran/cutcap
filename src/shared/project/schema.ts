@@ -7,6 +7,11 @@
 //   - Thời gian luôn là số nguyên micro-giây (kiểu Micros).
 //   - Nếu đổi cấu trúc mà file cũ không còn đọc đúng: tăng PROJECT_FORMAT_VERSION
 //     và viết hàm chuyển đổi trong migrate.ts.
+import type { Beauty } from '../render/beauty'
+import type { FaceShape } from '../render/faceShape'
+import type { ColorGrade } from '../render/grade'
+import type { ClipMask } from '../render/mask'
+import type { SpeedCurve } from '../timeline/speedCurve'
 import type { Micros } from './time'
 
 /** Phiên bản định dạng file dự án. */
@@ -107,7 +112,22 @@ export interface Transition {
 }
 
 /** Các thuộc tính đặt keyframe được (xem shared/timeline/keyframes.ts). */
-export const KEYFRAME_PROPS = ['scale', 'x', 'y', 'rotation', 'opacity', 'volume'] as const
+export const KEYFRAME_PROPS = [
+  'scale',
+  'x',
+  'y',
+  'rotation',
+  'opacity',
+  'volume',
+  // Mặt nạ (Điều chỉnh → Mặt nạ)
+  'maskX',
+  'maskY',
+  'maskRotation',
+  'maskWidth',
+  'maskHeight',
+  'maskFeather',
+  'maskRoundness'
+] as const
 export type KeyframeProp = (typeof KEYFRAME_PROPS)[number]
 
 export interface Keyframe {
@@ -189,6 +209,25 @@ export interface MediaClip extends ClipBase {
    * null = chưa chuẩn hóa. Trường mới – file cũ không có → null.
    */
   loudnorm: { measured: number; prevVolume: number } | null
+  /**
+   * Làm đẹp – Làn da (làm mịn, trắng da, trắng răng…), mỗi mức 0–100. null = không làm đẹp.
+   * Trường mới – file cũ không có → null. Xem shared/render/beauty.ts.
+   */
+  beauty: Beauty | null
+  /** Làm đẹp – Khuôn mặt (thon gọn, V-line, cằm…). null = không chỉnh. Trường mới – file cũ không có → null. */
+  faceShape: FaceShape | null
+  /**
+   * Tốc độ → Uốn cong: tốc độ thay đổi trong clip (khi có thì bỏ qua `speed`). null = tốc độ đều.
+   * Trường mới – file cũ không có → null. Xem shared/timeline/speedCurve.ts.
+   */
+  speedCurve: SpeedCurve | null
+  /**
+   * Điều chỉnh màu (Cơ bản, HSL, Đường cong, Vòng tròn màu). null = không chỉnh.
+   * Trường mới – file cũ không có → null. Xem shared/render/grade.ts.
+   */
+  grade: ColorGrade | null
+  /** Mặt nạ (Điều chỉnh → Mặt nạ). null = không có. Trường mới – file cũ không có → null. */
+  mask: ClipMask | null
 }
 
 export const TEXT_ANIMATIONS = ['none', 'fade', 'slide-up', 'zoom', 'typewriter'] as const
@@ -206,6 +245,61 @@ export interface TextStyle {
   strokeColor: string | null
   strokeWidth: number
   backgroundColor: string | null
+  /** Hiệu ứng văn bản (gradient, nhiều lớp viền, phát sáng, 3D, khung nền…). Trường mới – file cũ không có → null. */
+  fx?: TextFx | null
+}
+
+/**
+ * Hiệu ứng văn bản (tab Văn bản → Hiệu ứng văn bản). Kích thước tính theo CỠ CHỮ (em: 0.1 = 10% cỡ chữ)
+ * → phóng to / thu nhỏ chữ thì hiệu ứng theo đúng tỉ lệ. Vẽ ở renderer/src/engine/text/drawText.ts.
+ */
+export interface TextFx {
+  /** Tô chữ bằng gradient (thay cho màu chữ); angle: độ, 90 = từ trên xuống; hard: các màu chia khúc rõ (không chuyển mềm). */
+  fill: { colors: string[]; angle: number; hard?: boolean } | null
+  /** Chữ rỗng: không tô ruột, chỉ còn viền. */
+  hollow?: boolean
+  /** Các lớp viền THÊM bên ngoài viền thường, từ trong ra ngoài (độ dày em, cộng dồn); colors: viền chuyển màu. */
+  outlines: { color: string; width: number; colors?: string[] }[]
+  /** Phát sáng quanh chữ (blur em). */
+  glow: { color: string; blur: number } | null
+  /** Bóng đổ (dx, dy, blur em). */
+  shadow: { color: string; dx: number; dy: number; blur: number } | null
+  /** Chữ nổi khối 3D: kéo dài theo hướng angle (độ), sâu depth em. */
+  extrude: { color: string; depth: number; angle: number } | null
+  /** Bản sao lệch phía sau chữ (glitch, viền đôi lệch); hollow: chỉ vẽ viền dày `width` em. */
+  echoes?: { color: string; dx: number; dy: number; hollow: boolean; width: number }[]
+  /** Kết cấu phủ trên mặt chữ. */
+  texture?: { kind: (typeof TEXT_TEXTURES)[number]; color: string; amount: number } | null
+  /** Vát cạnh: mép trên-trái sáng, dưới-phải tối (size em). */
+  bevel?: { light: string; dark: string; size: number } | null
+  /** Khung nền sau chữ. */
+  box: TextBox | null
+  /** Trang trí quanh chữ (sao lấp lánh, tim, tuyết, lửa, sơn chảy…). */
+  decor?: { kind: (typeof TEXT_DECORS)[number]; color: string; count: number } | null
+}
+
+export const TEXT_TEXTURES = ['glitter', 'noise', 'halftone', 'stripes'] as const
+export const TEXT_DECORS = ['sparkle', 'star', 'heart', 'bubble', 'snow', 'flame', 'drip', 'confetti'] as const
+
+export const TEXT_BOX_SHAPES = ['rect', 'pill', 'skew', 'ragged', 'cloud', 'brush', 'banner', 'scribble'] as const
+export type TextBoxShape = (typeof TEXT_BOX_SHAPES)[number]
+export const TEXT_BOX_PATTERNS = ['stripes', 'dots', 'grid'] as const
+
+export interface TextBox {
+  shape: TextBoxShape
+  /** 1 màu, hoặc 2 màu = gradient dọc. */
+  colors: string[]
+  /** Khoảng đệm quanh chữ (em). */
+  padX: number
+  padY: number
+  /** Bo góc (em) – kiểu rect. */
+  radius: number
+  /** Xoay nghiêng cả khung (độ). */
+  tilt: number
+  /** Hoa văn phủ lên khung. */
+  pattern: { kind: (typeof TEXT_BOX_PATTERNS)[number]; color: string } | null
+  /** Viền khung. */
+  stroke: { color: string; width: number } | null
 }
 
 export interface TextClip extends ClipBase {
@@ -215,6 +309,10 @@ export interface TextClip extends ClipBase {
   transform: Transform
   animationIn: TextAnimation
   animationDuration: Micros
+  /** Hiệu ứng động (bảng phải → Hiệu ứng động): Vào / Ra (thời lượng) và Vòng lặp (chu kỳ). Xem shared/render/textAnims.ts. */
+  textIn?: { id: string; duration: Micros } | null
+  textOut?: { id: string; duration: Micros } | null
+  textLoop?: { id: string; period: Micros } | null
   /**
    * Chữ do "Phụ đề tự động" tạo (để "Xóa phụ đề hiện tại" chỉ xóa đúng những chữ này).
    * Trường mới – file cũ không có → false.
@@ -244,6 +342,13 @@ export type Clip = MediaClip | TextClip | StickerClip | EffectClip
 
 // ───────────────────────── Dự án ─────────────────────────
 
+/**
+ * Ảnh bìa của video (nút "Ảnh bìa" ở đầu track chính, giống CapCut): một khung hình của video
+ * (tại thời điểm `time` trên timeline) hoặc một ảnh trên máy. Khi xuất, ảnh bìa được nhúng vào file mp4
+ * (hình thu nhỏ). `thumb`: ảnh nhỏ (JPEG data URL) để hiện trên giao diện.
+ */
+export type ProjectCover = ({ kind: 'frame'; time: Micros } | { kind: 'image'; path: string }) & { thumb: string }
+
 export interface Project {
   formatVersion: number
   id: Id
@@ -256,4 +361,6 @@ export interface Project {
   assets: Record<Id, MediaAsset>
   /** Thứ tự hiển thị trên timeline: phần tử đầu tiên nằm trên cùng. */
   tracks: Track[]
+  /** Ảnh bìa (không có = dùng khung hình đầu như bình thường). */
+  cover?: ProjectCover | null
 }

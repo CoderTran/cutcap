@@ -82,12 +82,45 @@ describe.skipIf(!hasFfmpeg)('MediaService với ffmpeg thật', () => {
     }
     const done = updates.filter((u) => u.path === files.mkv).at(-1)!
     const proxyPath = filePathFromMediaUrl(done.playbackUrl!)!
-    expect(proxyPath.endsWith('proxy.mp4')).toBe(true)
+    expect(proxyPath.endsWith('proxy-1080.mp4')).toBe(true) // mặc định chất lượng "Cao"
     expect(existsSync(proxyPath)).toBe(true)
 
     // Gọi lại: dùng proxy có sẵn, không tạo lại
     expect((await service.prepare(files.mkv)).proxy).toBe('ready')
   }, 40_000)
+
+  it('đổi chất lượng xem trước: tạo bản mới (tạm phát bản cũ), đổi lại thì dùng ngay bản đã có; "Đầy đủ" phát file gốc', async () => {
+    const lastOf = (path: string): MediaPreview => updates.filter((u) => u.path === path).at(-1)!
+    const waitReady = async (path: string, suffix: string): Promise<void> => {
+      const deadline = Date.now() + 30_000
+      while (!(lastOf(path).proxy === 'ready' && filePathFromMediaUrl(lastOf(path).playbackUrl ?? '')?.endsWith(suffix))) {
+        if (Date.now() > deadline) throw new Error(`Chờ ${suffix} quá lâu`)
+        await new Promise((r) => setTimeout(r, 100))
+      }
+    }
+    await service.setPreviewQuality('low')
+    const switching = lastOf(files.mkv)
+    expect(['queued', 'running']).toContain(switching.proxy)
+    expect(filePathFromMediaUrl(switching.playbackUrl!)!.endsWith('proxy-1080.mp4')).toBe(true) // tạm phát bản 1080p
+    await waitReady(files.mkv, 'proxy.mp4')
+    await service.setPreviewQuality('high')
+    expect(lastOf(files.mkv)).toMatchObject({ proxy: 'ready' })
+    expect(filePathFromMediaUrl(lastOf(files.mkv).playbackUrl!)!.endsWith('proxy-1080.mp4')).toBe(true)
+
+    // Video máy ảnh lớn hơn Full HD (H.264 yuvj420p, .MOV): "Đầy đủ" = file gốc, "Trung bình" = proxy 720p
+    const big = join(dir, 'Máy ảnh.mov')
+    await runProcess(ffmpeg, [
+      '-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=2400x1350:rate=30', '-t', '1',
+      '-c:v', 'libx264', '-pix_fmt', 'yuvj420p', big
+    ])
+    await service.setPreviewQuality('full')
+    const full = await service.prepare(big)
+    expect(full.proxy).toBe('not-needed')
+    expect(filePathFromMediaUrl(full.playbackUrl!)).toBe(big)
+    await service.setPreviewQuality('medium')
+    await waitReady(big, 'proxy-720.mp4')
+    await service.setPreviewQuality('high')
+  }, 90_000)
 
   it('ảnh và âm thanh', async () => {
     const png = await service.prepare(files.png)

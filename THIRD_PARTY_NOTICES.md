@@ -30,6 +30,20 @@ của Cutcap và của FFmpeg.
 - Mô hình Whisper `ggml-small-q5_1.bin` (OpenAI Whisper, bản ggml) – MIT –
   https://huggingface.co/ggerganov/whisper.cpp – không đóng gói, app tải về khi dùng lần đầu
 
+## MediaPipe Face Landmarker (Làm đẹp)
+
+- Thư viện `@mediapipe/tasks-vision` 1.0.1 – giấy phép **Apache-2.0** – https://github.com/google-ai-edge/mediapipe
+- Mô hình `face_landmarker.task` (Google, Apache-2.0) –
+  https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+- Đóng gói kèm bộ cài (thư mục `mediapipe/` của giao diện; chạy `npm run setup:face` để chuẩn bị)
+
+## Hiệu ứng âm thanh của Kenney.nl (đóng gói kèm bộ cài)
+
+- Tác giả: Kenney Vleugels (https://www.kenney.nl)
+- Giấy phép: Creative Commons Zero (CC0 1.0) – https://creativecommons.org/publicdomain/zero/1.0/
+- 182 âm thanh chọn từ các gói Impact Sounds, Interface Sounds, UI Audio, Digital Audio, RPG Audio, Casino Audio,
+  Sci-fi Sounds, Music Jingles; đã cân âm lượng và đổi tên. File gốc của từng âm thanh: `resources/sfx/kenney/SOURCES.json`.
+
 ## Electron & Chromium
 
 - Electron – giấy phép MIT – https://github.com/electron/electron

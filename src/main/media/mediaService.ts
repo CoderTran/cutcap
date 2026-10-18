@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, rename, rm, stat } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative } from 'node:path'
-import type { ExtractAudioResult, ImportMediaResult, MediaPreview } from '@shared/ipc'
+import type { ExtractAudioResult, ImportMediaResult, MediaPreview, PreviewQuality } from '@shared/ipc'
 import { derivedFileName, fxKeyOf, type AudioDerive } from '@shared/media/derived'
 import { audioFxChain, DENOISE_MODEL, parseAudioFxKey } from '@shared/render/voices'
 import { fileNameOf, mediaKindFromPath } from '@shared/media/formats'
@@ -23,6 +23,9 @@ import {
   loudnessArgs,
   parseIntegratedLoudness,
   voiceArgs,
+  canPlayOriginal,
+  PROXY_SHORT_SIDE,
+  PROXY_SHORT_SIDES,
   proxyArgs,
   proxyFileName,
   proxyNeeded,
@@ -46,6 +49,8 @@ interface ProxyJob {
   kind: ProxyKind
   info: ProbeInfo
   dest: string
+  /** Cạnh ngắn của video proxy (540 / 720 / 1080). */
+  shortSide: number
   controller: AbortController
 }
 
@@ -58,6 +63,8 @@ export class MediaService {
   private readonly preparing = new Map<string, Promise<MediaPreview>>()
   private readonly queue: ProxyJob[] = []
   private running: ProxyJob | null = null
+  /** Chất lượng khung Xem trước – giao diện gửi lên lúc mở app và mỗi khi người dùng đổi. */
+  private quality: PreviewQuality = 'high'
 
   constructor(private readonly options: MediaServiceOptions) {}
 
@@ -262,27 +269,73 @@ export class MediaService {
       if (existsSync(wave)) waveformUrl = mediaUrl(wave)
     }
 
-    // Bản phát: file gốc, proxy đã có sẵn, hoặc xếp hàng tạo proxy
-    const kind = proxyNeeded(info, path)
-    if (!kind) {
-      const { mtimeMs } = await stat(path)
-      return this.store({ ...base, thumbnailUrl, waveformUrl, playbackUrl: mediaUrl(path, Math.round(mtimeMs)) })
-    }
-    const proxyPath = join(dir, proxyFileName(kind))
-    if (existsSync(proxyPath)) {
-      return this.store({ ...base, thumbnailUrl, waveformUrl, playbackUrl: mediaUrl(proxyPath), proxy: 'ready', proxyProgress: 1 })
-    }
+    return this.choosePlayback(path, info, dir, { ...base, thumbnailUrl, waveformUrl })
+  }
 
-    const preview = this.store({ ...base, thumbnailUrl, waveformUrl, proxy: 'queued' })
-    this.enqueue({ path, kind, info, dest: proxyPath, controller: new AbortController() })
+  // ───────── Bản phát & chất lượng Xem trước ─────────
+
+  /**
+   * Bản dùng để phát file này theo chất lượng hiện tại.
+   * @returns null = phát thẳng file gốc; số = cạnh ngắn của bản proxy cần dùng
+   */
+  private wantedProxy(path: string, info: ProbeInfo): { kind: ProxyKind; shortSide: number } | null {
+    const kind = proxyNeeded(info, path)
+    if (!kind) return null
+    if (kind !== 'video') return { kind, shortSide: PROXY_SHORT_SIDE }
+    if (this.quality === 'full' && canPlayOriginal(info, path)) return null
+    return { kind, shortSide: PROXY_SHORT_SIDES[this.quality] }
+  }
+
+  /** Đặt bản phát: file gốc, proxy đã có sẵn, hoặc xếp hàng tạo proxy (tạm phát bản proxy khác nếu có). */
+  private async choosePlayback(path: string, info: ProbeInfo, dir: string, current: MediaPreview): Promise<MediaPreview> {
+    const wanted = this.wantedProxy(path, info)
+    if (!wanted) {
+      const { mtimeMs } = await stat(path)
+      return this.store({ ...current, playbackUrl: mediaUrl(path, Math.round(mtimeMs)), proxy: 'not-needed', proxyProgress: 0 })
+    }
+    const proxyPath = join(dir, proxyFileName(wanted.kind, wanted.shortSide))
+    if (existsSync(proxyPath)) {
+      return this.store({ ...current, playbackUrl: mediaUrl(proxyPath), proxy: 'ready', proxyProgress: 1 })
+    }
+    // Đang tạo bản mới (vd. vừa chuyển Thấp → Cao): vẫn xem được bằng bản proxy cũ trong lúc chờ
+    const fallback =
+      wanted.kind === 'video'
+        ? Object.values(PROXY_SHORT_SIDES)
+            .map((side) => join(dir, proxyFileName('video', side)))
+            .find((p) => existsSync(p))
+        : undefined
+    // Chưa có bản proxy nào mà file gốc phát được (vd. H.264 4K của máy ảnh) → tạm phát file gốc, khỏi màn hình trống
+    const original = !fallback && canPlayOriginal(info, path) ? mediaUrl(path, Math.round((await stat(path)).mtimeMs)) : null
+    const playbackUrl = fallback ? mediaUrl(fallback) : original
+    const preview = this.store({ ...current, playbackUrl, proxy: 'queued', proxyProgress: 0 })
+    this.enqueue({ path, kind: wanted.kind, info, dest: proxyPath, shortSide: wanted.shortSide, controller: new AbortController() })
     return preview
+  }
+
+  /**
+   * Đổi chất lượng Xem trước: bỏ các bản proxy video đang chờ tạo không còn cần, chọn lại bản phát
+   * cho mọi video đã mở (bản đã tạo trước đây được dùng lại ngay, không phải tạo lại).
+   */
+  async setPreviewQuality(quality: PreviewQuality): Promise<void> {
+    if (quality === this.quality) return
+    this.quality = quality
+    for (let i = this.queue.length - 1; i >= 0; i--) if (this.queue[i].kind === 'video') this.queue.splice(i, 1)
+    if (this.running?.kind === 'video') {
+      const wanted = this.wantedProxy(this.running.path, this.running.info)
+      if (wanted?.shortSide !== this.running.shortSide) this.running.controller.abort()
+    }
+    for (const preview of [...this.previews.values()]) {
+      if (preview.status !== 'ready') continue
+      const probed = this.probeCache.get(pathKey(preview.path))
+      if (probed?.info.kind !== 'video') continue
+      await this.choosePlayback(preview.path, probed.info, join(this.options.cacheRoot, probed.cacheKey), preview)
+    }
   }
 
   // ───────── Hàng đợi proxy ─────────
 
   private enqueue(job: ProxyJob): void {
-    const key = pathKey(job.path)
-    const duplicate = this.running?.path === job.path || this.queue.some((j) => pathKey(j.path) === key)
+    const duplicate = this.running?.dest === job.dest || this.queue.some((j) => j.dest === job.dest)
     if (!duplicate) this.queue.push(job)
     void this.pump()
   }
@@ -310,7 +363,7 @@ export class MediaService {
     const partial = `${job.dest}.part`
     let lastEmit = 0
     try {
-      await runProcess(this.ffmpegExe, proxyArgs(job.kind, job.path, partial), {
+      await runProcess(this.ffmpegExe, proxyArgs(job.kind, job.path, partial, job.shortSide), {
         signal: job.controller.signal,
         onStdoutLine: (line) => {
           const doneUs = parseProgressLine(line)
@@ -322,7 +375,9 @@ export class MediaService {
         }
       })
       await rename(partial, job.dest)
-      update({ proxy: 'ready', proxyProgress: 1, playbackUrl: mediaUrl(job.dest) })
+      // Người dùng đã đổi chất lượng trong lúc tạo → bản này vẫn giữ trong cache nhưng không đổi bản phát
+      const wanted = this.wantedProxy(job.path, job.info)
+      if (wanted?.shortSide === job.shortSide) update({ proxy: 'ready', proxyProgress: 1, playbackUrl: mediaUrl(job.dest) })
     } catch (err) {
       await rm(partial, { force: true })
       if ((err as Error).name !== 'AbortError') {

@@ -12,8 +12,10 @@ import { canHaveTransition } from '@shared/timeline/transitions'
 import { useEditorStore } from '../../state/editorStore'
 import { useProjectStore } from '../../state/projectStore'
 import { AudioSection, AudioToolsSection, DetachAudioSection, InfoSection, SpeedSection, VocalRemovalSection } from './ClipInfoPanel'
+import { BeautyPanel } from './BeautyPanel'
+import { GradePanel } from './GradePanel'
+import { SpeedCurvePanel } from './SpeedCurvePanel'
 import { AnimationPanel } from './AnimationPanel'
-import { ColorSection } from './ColorSection'
 import { EffectPanel } from './EffectPanel'
 import { ProjectDetails } from './ProjectDetails'
 import { ProjectSettingsPanel } from './ProjectSettingsPanel'
@@ -59,6 +61,8 @@ export function Inspector(): React.JSX.Element {
   // Đổi clip → về tab được yêu cầu (vd. Chuyển cảnh) hoặc tab đầu tiên
   const [tab, setTab] = useState<TabId>(tabs[0])
   const [audioSub, setAudioSub] = useState<'basic' | 'voice'>('basic')
+  const [videoSub, setVideoSub] = useState<'basic' | 'beauty'>('basic')
+  const [speedSub, setSpeedSub] = useState<'standard' | 'curve'>('standard')
   const selectionKey = `${clip?.id ?? 'none'}|${requestedTab ?? ''}`
   useEffect(() => {
     setTab(requestedTab && tabs.includes(requestedTab as TabId) ? (requestedTab as TabId) : tabs[0])
@@ -95,8 +99,26 @@ export function Inspector(): React.JSX.Element {
             {locked && <p className="hint">🔒 {t('clip.locked')}</p>}
             {current === 'video' && (
               <>
-                <TransformSection clip={clip} disabled={locked} />
-                <InfoSection clip={clip} track={track} asset={asset} />
+                {/* Video có 2 mục như CapCut: Cơ bản | Làm đẹp (ảnh/video có hình) */}
+                {asset?.kind !== 'audio' && (
+                  <div className="segmented audio-sub">
+                    <button className={videoSub === 'basic' ? 'active' : ''} onClick={() => setVideoSub('basic')}>
+                      {t('voices.basic')}
+                    </button>
+                    <button className={videoSub === 'beauty' ? 'active' : ''} onClick={() => setVideoSub('beauty')}>
+                      {t('beauty.title')}
+                      {(clip.beauty || clip.faceShape) && <span className="anim-dot" />}
+                    </button>
+                  </div>
+                )}
+                {videoSub === 'beauty' && asset?.kind !== 'audio' ? (
+                  <BeautyPanel clip={clip} disabled={locked} />
+                ) : (
+                  <>
+                    <TransformSection clip={clip} disabled={locked} />
+                    <InfoSection clip={clip} track={track} asset={asset} />
+                  </>
+                )}
               </>
             )}
             {current === 'audio' && (
@@ -124,9 +146,23 @@ export function Inspector(): React.JSX.Element {
                 )}
               </>
             )}
-            {current === 'speed' && <SpeedSection clip={clip} disabled={locked} />}
+            {current === 'speed' && (
+              <>
+                {/* Tốc độ có 2 mục như CapCut: Tiêu chuẩn (tốc độ đều) | Uốn cong (đổi tốc độ trong clip) */}
+                <div className="segmented audio-sub">
+                  <button className={speedSub === 'standard' ? 'active' : ''} onClick={() => setSpeedSub('standard')}>
+                    {t('speedCurve.standard')}
+                  </button>
+                  <button className={speedSub === 'curve' ? 'active' : ''} onClick={() => setSpeedSub('curve')}>
+                    {t('speedCurve.title')}
+                    {clip.speedCurve && <span className="anim-dot" />}
+                  </button>
+                </div>
+                {speedSub === 'curve' ? <SpeedCurvePanel clip={clip} disabled={locked} /> : <SpeedSection clip={clip} disabled={locked} />}
+              </>
+            )}
             {current === 'anim' && <AnimationPanel clip={clip} disabled={locked} />}
-            {current === 'adjust' && asset && <ColorSection clip={clip} asset={asset} disabled={locked} />}
+            {current === 'adjust' && asset && <GradePanel clip={clip} asset={asset} disabled={locked} />}
             {current === 'transition' && <TransitionSection clip={clip} track={track} />}
           </div>
         )}

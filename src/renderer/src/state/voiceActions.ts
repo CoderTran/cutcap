@@ -5,6 +5,7 @@
 import type { Id } from '@shared/project/schema'
 import { normalizeGain } from '@shared/render/audioMath'
 import { audioFxKey, isAudioFxEmpty, type AudioFxSettings } from '@shared/render/voices'
+import { sourceSpanOf } from '@shared/timeline/clipTime'
 import { clipEnd, findClip } from '@shared/timeline/clips'
 import { applyAudioFx, audioFxSourceAssetId, canProcessAudio, clearAudioFx } from '@shared/timeline/detach'
 import { editorStore } from './editorStore'
@@ -100,7 +101,7 @@ export async function setLoudnessNormalized(clipId: Id, on: boolean): Promise<st
   const media = mediaStore.getState()
   media.setImporting(true)
   try {
-    const measured = await window.cutcap.measureLoudness(asset.path, clip.sourceIn, Math.round(clip.duration * clip.speed))
+    const measured = await window.cutcap.measureLoudness(asset.path, clip.sourceIn, sourceSpanOf(clip))
     if (measured === null) return 'silent'
     projectStore.getState().apply('history.loudnorm', (d) => {
       const c = findClip(d, clipId)?.clip

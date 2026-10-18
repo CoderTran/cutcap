@@ -1,7 +1,8 @@
 // Nối Exporter với Electron: dò encoder, hộp thoại lưu file, bắt đầu/hủy xuất, mở thư mục.
 import { join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { IpcChannels, type ExportRequest } from '@shared/ipc'
+import { IpcChannels, type BeautyJobRequest, type ExportRequest } from '@shared/ipc'
+import { BeautyJobs } from '../beauty/beautyJobs'
 import { detectEncoders } from '../export/encoders'
 import { listSystemFonts } from '../fonts'
 import { Exporter } from '../export/exporter'
@@ -24,6 +25,14 @@ export function registerExportHandlers(ffmpegExe: string): void {
     tempDir: join(app.getPath('temp'), 'Cutcap'),
     onProgress: (p) => broadcast(IpcChannels.exportProgress, p)
   })
+
+  // Vẽ lại clip có Làm đẹp trước khi xuất (giao diện làm phần AI + WebGL)
+  const beauty = new BeautyJobs(ffmpegExe, join(app.getPath('temp'), 'Cutcap'))
+  ipcMain.handle(IpcChannels.beautyOpen, (_event, request: BeautyJobRequest) => beauty.open(request))
+  ipcMain.handle(IpcChannels.beautyRead, (_event, id: string) => beauty.read(id))
+  ipcMain.handle(IpcChannels.beautyWrite, (_event, id: string, frame: Uint8Array) => beauty.write(id, frame))
+  ipcMain.handle(IpcChannels.beautyClose, (_event, id: string, ok: boolean) => beauty.close(id, ok))
+  app.on('before-quit', () => beauty.cancelAll())
 
   ipcMain.handle(IpcChannels.exportDetectEncoders, () => detectEncoders(ffmpegExe))
   ipcMain.handle(IpcChannels.listFonts, () => listSystemFonts())

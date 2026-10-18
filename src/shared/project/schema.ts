@@ -102,7 +102,19 @@ export interface ColorAdjust {
   saturation: number
 }
 
-export const TRANSITION_KINDS = ['fade', 'slide-left', 'slide-right', 'zoom'] as const
+export const TRANSITION_KINDS = [
+  'fade',
+  'slide-left',
+  'slide-right',
+  'zoom',
+  // Làm méo điểm ảnh (shared/render/pixelTransitions.ts)
+  'rippleChroma',
+  'waveWipe',
+  'flashGlow',
+  'mosaic',
+  'swirl',
+  'tearUp'
+] as const
 export type TransitionKind = (typeof TRANSITION_KINDS)[number]
 
 /** Chuyển cảnh giữa clip này và clip ngay trước nó trên cùng track. */

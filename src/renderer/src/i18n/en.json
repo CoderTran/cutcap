@@ -315,7 +315,13 @@
       "fade": "Fade",
       "slide-left": "Slide left",
       "slide-right": "Slide right",
-      "zoom": "Zoom"
+      "zoom": "Zoom",
+      "rippleChroma": "Chromatic ripple",
+      "waveWipe": "Wave wipe",
+      "flashGlow": "Flash glow",
+      "mosaic": "Mosaic",
+      "swirl": "Swirl",
+      "tearUp": "Tear up"
     },
     "hint": "Transition from the previous clip into this one, centred on the cut – video length is unchanged."
   },

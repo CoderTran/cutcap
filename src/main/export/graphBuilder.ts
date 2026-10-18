@@ -24,6 +24,7 @@ import { edgeSpeeds, sourceSpanOf } from '@shared/timeline/clipTime'
 import { curveSegments, curveSpeedAt } from '@shared/timeline/speedCurve'
 import { hasColorChanges, isGradeEmpty, spatialParams, type ColorGrade } from '@shared/render/grade'
 import { transitionAt, type ActiveTransition } from '@shared/timeline/transitions'
+import { geqExprs, isPixelTransition, pixelRecipe } from '@shared/render/pixelTransitions'
 
 export interface ExportGraph {
   /** Tham số đầu vào: [-ss … -t … -i file] lặp lại cho từng clip. */
@@ -206,6 +207,30 @@ export function animatedLayerFilters(
 }
 
 /**
+ * Chuyển cảnh làm méo điểm ảnh của một lớp: geq (định dạng gbrap) với biểu thức sinh từ cùng công thức với khung
+ * Xem trước (shared/render/pixelTransitions.ts), chỉ bật trong khoảng chuyển cảnh (enable) → không làm chậm cả clip.
+ * Thời gian T là thời gian cục bộ của lớp (0 = lúc lớp bắt đầu hiện): clip vào → [0, dur]; clip ra → [len − dur, len].
+ */
+export function pixelTransitionFilters(tin: ActiveTransition | null, tout: ActiveTransition | null, layerLen: Micros): string[] {
+  const out: string[] = []
+  const add = (kind: string, role: 'in' | 'out', t0Us: Micros, durUs: Micros): void => {
+    const recipe = pixelRecipe(kind, role)
+    if (!recipe) return
+    const t0 = t0Us / MICROS_PER_SECOND
+    const dur = durUs / MICROS_PER_SECOND
+    const e = geqExprs(recipe, t0, dur)
+    out.push(
+      'format=gbrap',
+      `geq=r='${e.r}':g='${e.g}':b='${e.b}':a='${e.a}':enable='between(t,${t0.toFixed(6)},${(t0 + dur).toFixed(6)})'`,
+      'format=rgba'
+    )
+  }
+  if (tin && isPixelTransition(tin.kind)) add(tin.kind, 'in', 0, tin.duration)
+  if (tout && isPixelTransition(tout.kind)) add(tout.kind, 'out', layerLen - tout.duration, tout.duration)
+  return out
+}
+
+/**
  * Biểu thức vị trí ngang cho chuyển cảnh trượt (t = thời gian timeline, giây).
  * Cùng công thức với transitionEffect: vào từ phải/trái, ra sang trái/phải, tuyến tính.
  */
@@ -370,6 +395,8 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
         ...(input.padStart > 0 ? [`tpad=start_mode=clone:start_duration=${sec(input.padStart)}`] : []),
         ...(extAfter > 0 ? [`tpad=stop_mode=clone:stop_duration=${sec(extAfter)}`] : [])
       ]
+      // Chuyển cảnh làm méo điểm ảnh (gợn sóng, sóng sọc, khảm ô…): sau màu & mặt nạ, chỉ chạy trong khoảng chuyển cảnh
+      const pixel = pixelTransitionFilters(tin, tout, layerTo - layerFrom)
       // Mờ dần / phóng to khi chuyển cảnh: độ mờ tăng 0 → 1 (thời gian cục bộ của lớp, bắt đầu từ 0)
       const fadeIn = tin && (tin.kind === 'fade' || tin.kind === 'zoom') ? [`fade=t=in:st=0:d=${sec(tin.duration)}:alpha=1`] : []
 
@@ -382,6 +409,7 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
           ...timing,
           ...anim.size,
           ...colorFilters,
+          ...pixel,
           ...fadeIn,
           ...anim.place,
           `setpts=PTS+${sec(layerFrom)}/TB`
@@ -422,6 +450,7 @@ export function buildExportGraph(project: Project, opts: GraphOptions): ExportGr
         `scale=${w}:${h}:flags=bicubic`,
         'format=rgba',
         ...colorFilters,
+        ...pixel,
         ...(p.rotation !== 0
           ? [`rotate=${p.rotation.toFixed(6)}:ow=rotw(${p.rotation.toFixed(6)}):oh=roth(${p.rotation.toFixed(6)}):c=none`]
           : []),

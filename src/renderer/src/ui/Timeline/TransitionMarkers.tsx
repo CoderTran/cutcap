@@ -13,7 +13,13 @@ export const TRANSITION_ICON: Record<TransitionKind, string> = {
   fade: '◐',
   'slide-left': '⇠',
   'slide-right': '⇢',
-  zoom: '⊕'
+  zoom: '⊕',
+  rippleChroma: '◎',
+  waveWipe: '≋',
+  flashGlow: '✦',
+  mosaic: '▦',
+  swirl: '🌀',
+  tearUp: '⇡'
 }
 
 interface Props {

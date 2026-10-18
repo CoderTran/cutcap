@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TRANSITION_KINDS, type TransitionKind } from '@shared/project/schema'
+import { isPixelTransition } from '@shared/render/pixelTransitions'
 import { findClip } from '@shared/timeline/clips'
-import { DEFAULT_TRANSITION, findCutNear, maxTransitionDuration } from '@shared/timeline/transitions'
+import { defaultTransitionFor, findCutNear, maxTransitionDuration } from '@shared/timeline/transitions'
 import { setTransition } from '../../state/clipActions'
 import { editorStore } from '../../state/editorStore'
 import { playRange } from '../../state/playbackActions'
@@ -13,6 +14,7 @@ import { useFavorites } from '../../state/favoritesStore'
 import { FavoriteFilter, FavoriteStar } from '../Favorites'
 import { HelpTip } from '../HelpTip'
 import { TileAdd } from '../TileAdd'
+import { PixelTransitionThumb } from './PixelTransitionThumb'
 
 export function TransitionsTab(): React.JSX.Element {
   const { t } = useTranslation()
@@ -49,7 +51,7 @@ export function TransitionsTab(): React.JSX.Element {
     }
     setNotice(null)
     const index = found.track.clips.indexOf(found.clip)
-    const duration = Math.min(DEFAULT_TRANSITION, maxTransitionDuration(found.track.clips[index - 1], found.clip))
+    const duration = Math.min(defaultTransitionFor(kind), maxTransitionDuration(found.track.clips[index - 1], found.clip))
     editorStore.getState().setTilePreview({ kind: 'transition', clipId: found.clip.id, transition: { kind, duration } })
     // Phát từ trước chuyển cảnh một chút tới sau một chút; xong thì bỏ bản xem thử và đưa đầu phát về chỗ cũ
     const margin = 400_000
@@ -73,7 +75,7 @@ export function TransitionsTab(): React.JSX.Element {
       setNotice(t('transitionsTab.noCut'))
       return
     }
-    setTransition(clipId, kind, DEFAULT_TRANSITION)
+    setTransition(clipId, kind, defaultTransitionFor(kind))
     // Chọn clip phía sau mối cắt và mở tab Chuyển cảnh ở bảng phải để chỉnh thời lượng
     editorStore.getState().selectWithTab(clipId, 'transition')
     setNotice(null)
@@ -97,10 +99,14 @@ export function TransitionsTab(): React.JSX.Element {
             onDoubleClick={() => apply(kind)}
             title={t('transitionsTab.hint')}
           >
-            <span className={`transition-demo ${kind}`}>
-              <span className="demo-a" />
-              <span className="demo-b" />
-            </span>
+            {isPixelTransition(kind) ? (
+              <PixelTransitionThumb kind={kind} />
+            ) : (
+              <span className={`transition-demo ${kind}`}>
+                <span className="demo-a" />
+                <span className="demo-b" />
+              </span>
+            )}
             <span className="preset-name">{t(`transition.kinds.${kind}`)}</span>
             <FavoriteStar kind="transition" id={kind} />
             <TileAdd title={t('transitionsTab.hint')} onAdd={() => apply(kind)} />

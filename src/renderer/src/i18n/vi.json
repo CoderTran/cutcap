@@ -315,7 +315,13 @@
       "fade": "Mờ dần",
       "slide-left": "Trượt trái",
       "slide-right": "Trượt phải",
-      "zoom": "Phóng to"
+      "zoom": "Phóng to",
+      "rippleChroma": "Gợn sóng lệch màu",
+      "waveWipe": "Sóng sọc quét",
+      "flashGlow": "Lóe sáng",
+      "mosaic": "Khảm ô vuông",
+      "swirl": "Xoáy nước",
+      "tearUp": "Xé lên"
     },
     "hint": "Chuyển cảnh từ clip phía trước vào clip này, nằm giữa mối cắt – độ dài video không đổi."
   },

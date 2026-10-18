@@ -27,6 +27,7 @@ import { EffectPainter } from '../effects/applyEffect'
 import { BeautyPreview } from '../beauty/beautyPreview'
 import { GradePreview } from '../grade/gradePreview'
 import { MaskPreview } from '../mask/maskPreview'
+import { PixelTransitionPreview } from '../transition/pixelTransitionPreview'
 import { MediaElementPool } from './MediaElementPool'
 
 /** Vị trí một lớp hình vừa vẽ (pixel canvas) – để bấm chọn và kéo trên khung preview. */
@@ -39,6 +40,8 @@ export interface LayerBox {
 const MAX_DRIFT_SEC = 0.15
 /** Chuẩn bị (tải + tua sẵn) các clip sắp tới trong khoảng này, để chuyển clip không bị khựng. */
 const PRELOAD_US = 2 * MICROS_PER_SECOND
+/** Video vừa nhảy tới chưa có hình: giữ khung cũ tối đa bấy nhiêu ms (thay vì chớp đen). */
+const HOLD_MS = 600
 /** Giới hạn độ phân giải canvas preview (cạnh dài) để máy yếu vẫn mượt. */
 const MAX_CANVAS_SIDE = 1920
 
@@ -52,8 +55,11 @@ export class PreviewEngine {
   private readonly beauty = new BeautyPreview(() => this.requestRender())
   private readonly grade = new GradePreview()
   private readonly masks = new MaskPreview()
+  private readonly pixelTx = new PixelTransitionPreview()
   /** Khung hình gần nhất của mỗi clip video – vẽ thay khi phần tử đang tua (tránh chớp đen). */
   private readonly lastFrames = new Map<Id, { canvas: HTMLCanvasElement; time: number }>()
+  /** Lúc bắt đầu giữ khung cũ chờ video có hình (0 = không giữ). */
+  private holdSince = 0
   private raf = 0
   private dirty = true
   private playing = false
@@ -288,26 +294,49 @@ export class PreviewEngine {
 
   /** Chép khung hình hiện tại của video (chỉ khi đã sang khung mới) để dùng lại lúc phần tử đang tua. */
   private rememberFrame(clipId: Id, el: HTMLVideoElement): void {
+    // Chỉ cần cỡ của khung Xem trước (video 4K: chép cả khung mỗi lần rất nặng)
+    const k = Math.min(1, Math.max(this.canvas.width, this.canvas.height) / Math.max(el.videoWidth, el.videoHeight))
+    const w = Math.max(1, Math.round(el.videoWidth * k))
+    const h = Math.max(1, Math.round(el.videoHeight * k))
     let entry = this.lastFrames.get(clipId)
-    if (entry && entry.time === el.currentTime && entry.canvas.width === el.videoWidth) return
+    if (entry && entry.time === el.currentTime && entry.canvas.width === w) return
     if (!entry) {
       entry = { canvas: document.createElement('canvas'), time: -1 }
       this.lastFrames.set(clipId, entry)
     }
-    if (entry.canvas.width !== el.videoWidth || entry.canvas.height !== el.videoHeight) {
-      entry.canvas.width = el.videoWidth
-      entry.canvas.height = el.videoHeight
+    if (entry.canvas.width !== w || entry.canvas.height !== h) {
+      entry.canvas.width = w
+      entry.canvas.height = h
     }
-    entry.canvas.getContext('2d')!.drawImage(el, 0, 0)
+    entry.canvas.getContext('2d')!.drawImage(el, 0, 0, w, h)
     entry.time = el.currentTime
   }
 
   // ───────── Vẽ ─────────
 
+  /** Có lớp video chưa có hình nào để vẽ (vừa nhảy tới, phần tử đang tua và chưa từng có khung hình)? */
+  private videoPending(layers: ReturnType<typeof visualLayersAt>): boolean {
+    return layers.some(({ clip, asset }) => {
+      if (asset?.kind !== 'video' || this.lastFrames.has(clip.id)) return false
+      const el = this.pool.existing(clip.id)
+      return !(el instanceof HTMLVideoElement && el.readyState >= 2 && el.videoWidth > 0 && !el.seeking)
+    })
+  }
+
   private draw(project: Project, t: Micros): void {
     const { ctx, canvas } = this
     const W = canvas.width
     const H = canvas.height
+    const layers = visualLayersAt(project, t)
+    // Video chưa có hình: giữ nguyên khung cũ một chút thay vì chớp đen (tối đa HOLD_MS, phòng file hỏng)
+    if (this.videoPending(layers)) {
+      const now = performance.now()
+      this.holdSince ||= now
+      if (now - this.holdSince < HOLD_MS) {
+        this.dirty = true
+        return
+      }
+    } else this.holdSince = 0
     ctx.globalAlpha = 1
     ctx.filter = 'none'
     ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -317,7 +346,7 @@ export class PreviewEngine {
     const layout: LayerBox[] = []
     const selected = editorStore.getState().selectedClipIds
     const beautyVisible = new Set<Id>()
-    for (const layer of visualLayersAt(project, t)) {
+    for (const layer of layers) {
       const { clip, asset } = layer
       if (clip.type === 'effect') {
         // Hiệu ứng: tác động lên mọi thứ đã vẽ (các track bên dưới), thời gian tính từ đầu clip
@@ -381,9 +410,14 @@ export class PreviewEngine {
       // Mặt nạ: phần ngoài vùng giữ lại trong suốt (lộ track bên dưới) – gắn theo khung hình của clip
       const mask = clip.type === 'media' ? maskAt(clip, t) : null
       if (mask) source = this.masks.apply(clip.id, mask, source, srcW, srcH)
-
       // Biến đổi tại t (keyframe) + hiệu ứng động Vào/Ra/Kết hợp cộng dồn lên trên (giống khi xuất)
       const tf = transformAt(clip, t)
+      // Chuyển cảnh làm méo điểm ảnh (gợn sóng, sóng sọc, khảm ô…) – sau mặt nạ, cùng thứ tự với lúc xuất.
+      // Xử lý ở đúng cỡ lớp hiện trên khung (video 4K mà khung nhỏ → nhẹ hơn hàng chục lần, không giật)
+      if (layer.pixel.length > 0) {
+        const side = Math.ceil(Math.max(W, H) * Math.max(1, tf.scale))
+        source = this.pixelTx.apply(clip.id, layer.pixel, source, srcW, srcH, side) ?? source
+      }
       const anim = clip.type === 'media' ? clipAnimAt(clip, t) : null
       const p = placeLayer(
         srcW,
@@ -422,6 +456,7 @@ export class PreviewEngine {
     this.beauty.sweep(beautyVisible)
     this.grade.sweep(beautyVisible)
     this.masks.sweep(beautyVisible)
+    this.pixelTx.sweep(beautyVisible)
     for (const id of this.lastFrames.keys()) if (!beautyVisible.has(id)) this.lastFrames.delete(id)
     this.layout = layout
     this.layoutListener?.(layout)

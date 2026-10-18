@@ -3144,3 +3144,9 @@ span.tile-add:hover {
   place-items: center;
   color: var(--text-dim);
 }
+
+/* Ô xem thử chuyển cảnh làm méo điểm ảnh (canvas WebGL) */
+canvas.transition-demo.pixel {
+  display: block;
+  object-fit: cover;
+}

@@ -1,5 +1,6 @@
 // "Tại thời điểm t, khung hình gồm những gì và đang phát tiếng gì?"
 // Hàm thuần – preview (Bước 5) và engine xuất video (Bước 6) cùng dùng, để hai bên luôn khớp nhau.
+import { isPixelTransition } from '../render/pixelTransitions'
 import type { Clip, MediaAsset, MediaClip, Project, Track } from '../project/schema'
 import type { Micros } from '../project/time'
 import { clipAssetId, clipEnd } from './clips'
@@ -30,6 +31,8 @@ export interface VisualLayer {
   sourceTime: Micros
   /** Hiệu ứng chuyển cảnh đang áp lên lớp này (NO_EFFECT nếu không có). */
   effect: TransitionEffect
+  /** Chuyển cảnh làm méo điểm ảnh đang áp lên lớp này (vai trò + tiến độ p 0 → 1). */
+  pixel: { kind: string; role: 'in' | 'out'; p: number }[]
 }
 
 /** Gộp 2 hiệu ứng (clip vừa đang vào vừa đang ra – khi clip rất ngắn). */
@@ -55,13 +58,20 @@ export function visualLayersAt(project: Project, t: Micros): VisualLayer[] {
       if (assetId && !asset) return
 
       let effect = NO_EFFECT
+      const pixel: VisualLayer['pixel'] = []
       const tin = transitionAt(project, track, i)
-      if (tin && t < tin.to) effect = combine(effect, transitionEffect(tin.kind, 'in', transitionProgress(tin, t)))
+      if (tin && t < tin.to) {
+        effect = combine(effect, transitionEffect(tin.kind, 'in', transitionProgress(tin, t)))
+        if (isPixelTransition(tin.kind)) pixel.push({ kind: tin.kind, role: 'in', p: transitionProgress(tin, t) })
+      }
       const tout = transitionAt(project, track, i + 1)
-      if (tout && t >= tout.from) effect = combine(effect, transitionEffect(tout.kind, 'out', transitionProgress(tout, t)))
+      if (tout && t >= tout.from) {
+        effect = combine(effect, transitionEffect(tout.kind, 'out', transitionProgress(tout, t)))
+        if (isPixelTransition(tout.kind)) pixel.push({ kind: tout.kind, role: 'out', p: transitionProgress(tout, t) })
+      }
 
       const sourceTime = clip.type === 'media' && asset ? clampedSourceTime(clip, asset, t).time : 0
-      layers.push({ clip, track, asset, sourceTime, effect })
+      layers.push({ clip, track, asset, sourceTime, effect, pixel })
     })
   }
   return layers

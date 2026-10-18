@@ -11,10 +11,13 @@ import { sourceTimeAt } from './clipTime'
 import type { Id, MediaAsset, MediaClip, Project, Track, TransitionKind } from '../project/schema'
 import type { Micros } from '../project/time'
 import { clipEnd, findClip } from './clips'
+import { isPixelTransition } from '../render/pixelTransitions'
 
 export const MIN_TRANSITION: Micros = 200_000
-export const MAX_TRANSITION: Micros = 2_000_000
+export const MAX_TRANSITION: Micros = 4_000_000
 export const DEFAULT_TRANSITION: Micros = 500_000
+/** Thời lượng mặc định theo kiểu: chuyển cảnh làm méo điểm ảnh cần dài hơn để kịp thấy (0,5 s quá nhanh). */
+export const defaultTransitionFor = (kind: string): Micros => (isPixelTransition(kind) ? 1_000_000 : DEFAULT_TRANSITION)
 /** 2 clip cách nhau dưới 1ms coi như liền nhau. */
 const ADJACENT_TOLERANCE: Micros = 1000
 
@@ -98,6 +101,9 @@ export function transitionEffect(kind: TransitionKind, role: 'in' | 'out', p: nu
       return { ...NO_EFFECT, offsetX: role === 'in' ? -(1 - p) : p }
     case 'zoom':
       return role === 'in' ? { alpha: p, offsetX: 0, frameZoom: 1.2 - 0.2 * p } : NO_EFFECT
+    default:
+      // Chuyển cảnh làm méo điểm ảnh: xử lý riêng (VisualLayer.pixel / shared/render/pixelTransitions.ts)
+      return NO_EFFECT
   }
 }
 
